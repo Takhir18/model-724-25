@@ -78,32 +78,77 @@ function officeBox(name, color, x0, y0, z0, x1, y1, z1, kind='office_furnishing'
 }
 const oak='#ba9167', oakLight='#d6b58f', steel='#33383a', upholstery='#706d68';
 function desk(x,y) {
-  officeBox('Стол',oak,x-.68,y-.32,.72,x+.68,y+.32,.76);
-  for(const dx of [-.58,.58]) for(const dy of [-.24,.24])
-    officeBox('Ножки стола',steel,x+dx-.018,y+dy-.018,.02,x+dx+.018,y+dy+.018,.72);
-  officeBox('Монитор',steel,x-.24,y+.19,.81,x+.24,y+.23,1.13);
-  officeBox('Экран','#73838a',x-.215,y+.184,.84,x+.215,y+.19,1.10);
-  officeBox('Подставка монитора',steel,x-.035,y+.18,.76,x+.035,y+.23,.83);
-  officeBox('Клавиатура','#303336',x-.23,y-.13,.764,x+.23,y+.02,.778);
+  officeBox('Стол',oakLight,x-.68,y-.32,.72,x+.68,y+.32,.755);
+  officeBox('Кромка стола',oak,x-.68,y-.32,.72,x+.68,y-.307,.755);
+  for(const dx of [-.58,.58]) for(const dy of [-.24,.24]) {
+    officeBox('Ножки стола',steel,x+dx-.022,y+dy-.022,.04,x+dx+.022,y+dy+.022,.72);
+    officeBox('Опора стола','#252a2b',x+dx-.027,y+dy-.027,.015,x+dx+.027,y+dy+.027,.04);
+  }
+  officeBox('Монитор','#252a2c',x-.245,y+.18,.81,x+.245,y+.205,1.12);
+  officeBox('Экран','#637780',x-.225,y+.172,.832,x+.225,y+.18,1.098);
+  officeBox('Подставка монитора',steel,x-.025,y+.19,.755,x+.025,y+.215,.84);
+  officeBox('Основание монитора',steel,x-.14,y+.14,.755,x+.14,y+.26,.765);
+  officeBox('Клавиатура','#303336',x-.23,y-.12,.755,x+.23,y+.025,.769);
+  for (let key=0;key<9;key++)
+    officeBox('Клавиши','#55585a',x-.21+key*.047,y-.085,.769,x-.175+key*.047,y-.035,.772);
+  officeBox('Мышь','#34383a',x+.30,y-.065,.755,x+.355,y+.02,.777);
   chair(x,y-.76);
 }
 function chair(x,y) {
-  officeBox('Офисное кресло',upholstery,x-.24,y-.22,.45,x+.24,y+.22,.52);
-  officeBox('Спинка кресла',upholstery,x-.24,y-.24,.5,x+.24,y-.17,.98);
-  officeBox('Стойка кресла',steel,x-.025,y-.025,.10,x+.025,y+.025,.45);
-  officeBox('Опора кресла',steel,x-.27,y-.028,.075,x+.27,y+.028,.11);
-  officeBox('Опора кресла',steel,x-.028,y-.27,.075,x+.028,y+.27,.11);
+  officeBox('Сиденье кресла',upholstery,x-.245,y-.22,.44,x+.245,y+.22,.515);
+  officeBox('Кромка сиденья','#575b5b',x-.235,y-.23,.455,x+.235,y-.22,.495);
+  officeBox('Спинка кресла','#555a59',x-.24,y-.255,.50,x+.24,y-.18,1.03);
+  officeBox('Обивка спинки',upholstery,x-.215,y-.178,.55,x+.215,y-.165,.99);
+  for(const dx of [-.285,.255]) {
+    officeBox('Стойка подлокотника',steel,x+dx,y-.025,.47,x+dx+.03,y+.01,.71);
+    officeBox('Подлокотник','#444949',x+dx-.015,y-.11,.70,x+dx+.045,y+.15,.735);
+  }
+  officeBox('Газлифт кресла','#777b79',x-.023,y-.023,.09,x+.023,y+.023,.44);
+  officeBox('Опора кресла',steel,x-.27,y-.026,.075,x+.27,y+.026,.11);
+  officeBox('Опора кресла',steel,x-.026,y-.27,.075,x+.026,y+.27,.11);
+  for(const [dx,dy] of [[-.26,0],[.26,0],[0,-.26],[0,.26]])
+    officeBox('Колёсико кресла','#292d2e',x+dx-.035,y+dy-.025,.018,x+dx+.035,y+dy+.025,.075);
 }
 function cabinet(x,y,width=1.2) {
   officeBox('Шкаф для документов',oakLight,x-width/2,y-.22,.02,x+width/2,y+.22,1.1);
-  for(let i=1;i<4;i++) officeBox('Полки шкафа',oak,x-width/2+.02,y-.231,.15+i*.22,x+width/2-.02,y-.22,.165+i*.22);
+  officeBox('Цоколь шкафа','#524b42',x-width/2+.02,y-.225,.02,x+width/2-.02,y+.225,.075);
+  for(const dx of [-width/4,width/4]){
+    officeBox('Дверца шкафа',oak,x+dx-width/4+.025,y-.232,.09,x+dx+width/4-.015,y-.22,1.07);
+    officeBox('Ручка шкафа',steel,x+dx+width/4-.08,y-.25,.92,x+dx+width/4-.045,y-.232,.97);
+  }
 }
 function plant(x,y,large=false) {
   const s=large?1:.55;
-  officeBox('Цветочное кашпо','#d6c9b6',x-.18*s,y-.18*s,.02,x+.18*s,y+.18*s,.39*s);
-  officeBox('Растение','#547653',x-.035*s,y-.035*s,.37*s,x+.035*s,y+.035*s,1.22*s);
-  for(const [dx,dy,z] of [[-.20,0,.7],[.15,.03,.85],[0,.16,.95],[-.12,-.12,1.10],[.11,-.09,1.24]])
-    officeBox('Листва','#67865d',x+dx*s-.11*s,y+dy*s-.06*s,z*s,x+dx*s+.11*s,y+dy*s+.06*s,(z+.14)*s);
+  const addMesh=(name,color,vertices,faces)=>{
+    const key='office_furnishing:'+color;
+    let mesh=officeGroups.get(key);
+    if(!mesh){mesh={level:1,kind:'office_furnishing',name,color,vertices:[],faces:[]};officeGroups.set(key,mesh);}
+    const start=mesh.vertices.length;
+    mesh.vertices.push(...vertices);
+    mesh.faces.push(...faces.map(face=>face.map(index=>start+index)));
+  };
+  const pot=[],potFaces=[],sides=12;
+  for(const [radius,height] of [[.13,.02],[.19,.39]])
+    for(let n=0;n<sides;n++){
+      const a=2*Math.PI*n/sides;
+      pot.push([x+radius*s*Math.cos(a),y+radius*s*Math.sin(a),height*s]);
+    }
+  for(let n=0;n<sides;n++){
+    const next=(n+1)%sides;
+    potFaces.push([n,next,sides+next],[n,sides+next,sides+n]);
+  }
+  addMesh('Керамическое кашпо','#d6c9b6',pot,potFaces);
+  officeBox('Земля в кашпо','#514a3d',x-.12*s,y-.12*s,.38*s,x+.12*s,y+.12*s,.395*s);
+  officeBox('Стебель растения','#547653',x-.012*s,y-.012*s,.39*s,x+.012*s,y+.012*s,1.12*s);
+  for(let n=0;n<11;n++){
+    const a=n*2.399, h=.48+n*.065, reach=(.24+.04*(n%3))*s;
+    const ux=Math.cos(a),uy=Math.sin(a),vx=-uy,vy=ux,w=.085*s;
+    const base=[x,y,h*s], tip=[x+ux*reach,y+uy*reach,(h+.23)*s];
+    const mid=[x+ux*reach*.55,y+uy*reach*.55,(h+.18)*s];
+    const verts=[base,[mid[0]+vx*w,mid[1]+vy*w,mid[2]],tip,[mid[0]-vx*w,mid[1]-vy*w,mid[2]],
+      [mid[0],mid[1],mid[2]+.035*s]];
+    addMesh('Листва',n%2?'#648758':'#4d754f',verts,[[0,1,4],[1,2,4],[2,3,4],[3,0,4],[4,1,0],[4,2,1],[4,3,2],[4,0,3]]);
+  }
 }
 function painting(x,y,axis='y') {
   if(axis==='y'){
@@ -119,8 +164,21 @@ function painting(x,y,axis='y') {
   }
 }
 function ceiling(x,y,length=1.2) {
-  officeBox('Световая линия','#f4e7cc',x-length/2,y-.045,3.48,x+length/2,y+.045,3.50,'light');
+  officeBox('Световая линия','#fff4d9',x-length/2,y-.045,3.48,x+length/2,y+.045,3.50,'office_ceiling_light');
   officeBox('Основание светильника','#e7dfd1',x-length/2-.025,y-.065,3.50,x+length/2+.025,y+.065,3.54);
+}
+// Narrow recessed borders and diffusers give the ceilings a finished edge.
+function ceilingBorder(x0,y0,x1,y1) {
+  const inset=.12, width=.045, z=3.49;
+  const frame='#d7cbbb', diffuser='#fff1ce';
+  for(const y of [y0+inset,y1-inset]) {
+    officeBox('Потолок · профиль',frame,x0+inset,y-width,z,x1-inset,y+width,z+.03);
+    officeBox('Потолок · подсветка',diffuser,x0+inset+.02,y-.018,z-.005,x1-inset-.02,y+.018,z,'office_ceiling_light');
+  }
+  for(const x of [x0+inset,x1-inset]) {
+    officeBox('Потолок · профиль',frame,x-width,y0+inset,z,x+width,y1-inset,z+.03);
+    officeBox('Потолок · подсветка',diffuser,x-.018,y0+inset+.02,z-.005,x+.018,y1-inset-.02,z,'office_ceiling_light');
+  }
 }
 function meeting(x,y,length=2.4) {
   officeBox('Стол переговорной',oakLight,x-length/2,y-.50,.72,x+length/2,y+.50,.77);
@@ -151,6 +209,9 @@ for(const room of departments){
 }
 meeting(32.8,3.8,3.1);plant(34.8,6.1,true);painting(35.53,4.8,'x');ceiling(32.8,6.2,1.7);
 meeting(10.6,8.2,1.5);plant(11.5,10.6);painting(10.6,5.47);
+for(const bounds of [[19.22,3.73,26.58,9.8],[29.92,.1,35.6,7.25],
+  [37.59,11.72,41.6,17.3],[25.1,11.72,30.1,17.3],[14.54,4.8,19.1,9.8]])
+  ceilingBorder(...bounds);
 // Storage rooms and archive retain their original purpose.
 for(const [x,y] of [[10.6,1.3],[10.6,4.6],[13.3,3.0],[15.2,3.0],[17.3,3.0],[39,6.2],[40.5,6.2]])cabinet(x,y,1);
 for(const [x,y] of [[10.6,3],[15.5,3.4],[39.5,6.6]])ceiling(x,y,.8);
@@ -280,6 +341,7 @@ const wallFinishes={
  stage_led:[0,0,7],
  stage_lens:[0,0,8]
 };
+wallFinishes.office_ceiling_light=[0,0,8];
 const noWallFinish=[0,0,0];
 function rgb(c){if(Array.isArray(c)){return c.slice(0,3).map(v=>v>1?v/255:v)}let s=(c||'#b8b7ae').replace('#','');if(s.length===3)s=s.split('').map(v=>v+v).join('');return [0,2,4].map(i=>parseInt(s.slice(i,i+2),16)/255)}
 for(const mesh of data){
@@ -296,7 +358,7 @@ for(const mesh of data){
  const emission=mesh.kind==='light'||mesh.kind==='facade_light'||mesh.kind==='stage_lens';
  const stageWash=mesh.drumLit?3:mesh.kind==='stage_haze'?-1:mesh.kind==='stage'?1:mesh.kind==='stage_partition'?2:0;
  const wallFinish=mesh.finish||mesh.kind;
- const finish=wallFinishes[wallFinish]||noWallFinish;
+ const finish=(lev==='1'&&(mesh.kind==='wall'||mesh.kind==='interior_plaster'))?wallFinishes.hall_limewash:(wallFinishes[wallFinish]||noWallFinish);
  const walkHidden=mesh.kind==='door'||(
   mesh.kind==='frame'&&/^(Притвор|Ручка двери) · Терраса, ось 6$/.test(mesh.name)
  );
@@ -625,7 +687,8 @@ void main(){
  }
  if(ground>.5){rgb=mix(vec3(.943,.950,.914),vec3(.878,.899,.846),smoothstep(0.,95.,length(pos.xy-vec2(20.,13.))));rgb*=1.-.16*shade;}
  if(night>.5){
-  rgb*=stageWash>2.5?vec3(.84,.76,.67):vec3(ground>.5?.20:.40);
+  bool firstFloorInterior=walkMode>.5&&origin.z<3.75&&pos.z<3.58&&pos.z>=0.&&pos.x>0.&&pos.x<41.6&&pos.y>-.2&&pos.y<26.4;
+  rgb*=firstFloorInterior?vec3(.84,.79,.71):(stageWash>2.5?vec3(.84,.76,.67):vec3(ground>.5?.20:.40));
   if(masonry>.5)rgb+=vec3(.63,.39,.18)*wallBeam(pos,n);
   if(pos.x>29.8&&pos.x<41.8&&pos.y>5.2&&pos.y<17.4&&pos.z>7.5&&wood>.5)rgb+=vec3(.12,.075,.025);
   if(emission>.5)rgb=vec3(1.,.73,.38);
