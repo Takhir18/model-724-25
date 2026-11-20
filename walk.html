@@ -143,7 +143,7 @@ function activeGroups(){
  if(state.level==='all')return groups;
  return state.cutaway?cutGroups(state.level):fullFloors.get(state.level);
 }
-function updateSize(){const r=stage.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,gl?2:1.5);const w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));if(w!==canvas.width||h!==canvas.height){canvas.width=w;canvas.height=h}return {w:r.width,h:r.height}}
+function updateSize(){const r=stage.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,gl?2:1.5);const walkDpr=(!gl&&walkState.active)?Math.min(dpr,720/Math.max(1,r.width)):dpr;const w=Math.max(1,Math.round(r.width*walkDpr)),h=Math.max(1,Math.round(r.height*walkDpr));if(w!==canvas.width||h!==canvas.height){canvas.width=w;canvas.height=h}return {w:r.width,h:r.height}}
 function basis(dir,top=false){const right=top?[1,0,0]:unit(cross([0,0,1],dir)),up=unit(cross(dir,right));return {right,up,dir}}
 function getView(w,h){
  if(walkState.active)return walkView(w,h);
@@ -369,7 +369,7 @@ function renderSoft(v){
 function initSoft(){const fresh=canvas.cloneNode(false);canvas.replaceWith(fresh);canvas=fresh;gl=null;ctx=canvas.getContext('2d')}
 try{initWebGL()}catch(error){initSoft()}
 let queued=false,lastView;
-function draw(){queued=false;const {w,h}=updateSize();if(!w||!h)return;const v=getView(w,h);lastView=v;if(gl)renderGL(v);else renderSoft(v);
+function draw(){queued=false;const {w,h}=updateSize();if(!w||!h)return;const v=getView(w,h);lastView=v;if(gl)renderGL(v);else if(v.perspective)renderWalkSoft(v);else renderSoft(v);
  const preferred=80/v.scale, exponent=Math.pow(10,Math.floor(Math.log10(preferred)));const step=[1,2,5,10].reduce((p,x)=>Math.abs(x*exponent-preferred)<Math.abs(p*exponent-preferred)?x:p,1)*exponent;
  $('scaleText').textContent=step.toLocaleString('ru-RU')+' м';$('scaleLine').style.width=step*v.scale+'px';renderNames(v);
 }
@@ -394,10 +394,9 @@ $('night').onclick=()=>{state.night=!state.night;$('night').textContent=state.ni
 function floorChanged(level){
  if(walkState.active){if(level==='all')level='1';walkPlace(level)}
  state.level=level;$('cutaway').hidden=level==='all';setCutaway(false);state.pan=[0,0];state.zoom=1;state.el=level==='all'?.49:.83;
- if(walkState.active){$('cutaway').hidden=true;$('names').hidden=true;$('sheetBtn').hidden=true;}
  document.querySelectorAll('[data-level]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.level===level)));
  $('sheetBtn').hidden=!plans.some(p=>String(p.level)===level);
- $('names').hidden=level==='all'||!labels.some(l=>String(l.level)===level);
+ $('names').hidden=level==='all'||!labels.some(l=>String(l.level)===level);if(walkState.active){$('cutaway').hidden=true;$('names').hidden=true;$('sheetBtn').hidden=true;}
  schedule();
 }
 document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>floorChanged(b.dataset.level));
@@ -483,7 +482,6 @@ function walkPlace(level){
  const p=walkStarts[level]||walkStarts[1];walkState.x=p[0];walkState.y=p[1];walkState.z=p[2];walkState.yaw=p[3];walkState.pitch=0;walkState.keys.clear();walkState.last=0;
 }
 function walkOn(){
- if(!gl){alert('Для режима прогулки включите WebGL в браузере.');return}
  if(state.level==='all')floorChanged('1');
  walkState.active=true;walkState.priorNight=state.night;state.night=false;$('night').textContent='☾ Вечер';$('night').setAttribute('aria-pressed','false');
  state.top=false;state.cutaway=false;state.names=false;walkPlace(state.level);walkHud.hidden=false;walkButton.textContent='↩ Общий вид';walkButton.setAttribute('aria-pressed','true');$('above').hidden=true;$('cutaway').hidden=true;$('names').hidden=true;$('sheetBtn').hidden=true;stage.classList.add('walking');schedule();
@@ -522,6 +520,42 @@ window.addEventListener('keyup',e=>{if(walkState.active)walkKey(e.key.toLowerCas
 window.addEventListener('blur',()=>{walkState.keys.clear();walkState.last=0});
 walkHud.querySelector('[data-walk-terrace]').onclick=()=>{floorChanged('3');walkPlace('terrace');schedule()};
 walkHud.querySelectorAll('[data-walk]').forEach(button=>{const key=button.dataset.walk;button.addEventListener('pointerdown',e=>{e.preventDefault();button.setPointerCapture(e.pointerId);walkKey(key,true)});for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>walkKey(key,false))});
+// Perspective software fallback for devices without WebGL. Clip triangles at
+// the near plane before projection and interpolate reciprocal depth per pixel.
+function renderWalkSoft(v){
+ const w=canvas.width,h=canvas.height;
+ if(!softFrame||softFrame.width!==w||softFrame.height!==h){softFrame=ctx.createImageData(w,h);softDepth=new Float32Array(w*h)}
+ const pixels=new Uint32Array(softFrame.data.buffer);pixels.fill(state.night?0xff24160e:0xffdededb);softDepth.fill(-Infinity);
+ const near=.08,focal=h*.675,origin=v.origin,right=v.right,up=v.up,back=v.dir;
+ const camera=(a,i)=>{const x=a[i]-origin[0],y=a[i+1]-origin[1],z=a[i+2]-origin[2];return [x*right[0]+y*right[1]+z*right[2],x*up[0]+y*up[1]+z*up[2],-(x*back[0]+y*back[1]+z*back[2])]};
+ const clip=input=>{const out=[];for(let i=0;i<input.length;i++){const p=input[i],q=input[(i+1)%input.length],pin=p[2]>=near,qin=q[2]>=near;if(pin)out.push(p);if(pin!==qin){const t=(near-p[2])/(q[2]-p[2]);out.push([p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t,near])}}return out};
+ const project=p=>[w*.5+p[0]*focal/p[2],h*.5-p[1]*focal/p[2],1/p[2]];
+ for(const group of v.visible){const a=group.packed;
+  for(let i=0;i<a.length;i+=30){
+   const poly=clip([camera(a,i),camera(a,i+10),camera(a,i+20)]);if(poly.length<3)continue;
+   const nx=a[i+3],ny=a[i+4],nz=a[i+5],factor=.72+.12*Math.max(nz,0)+.14*Math.max(0,nx*sun[0]+ny*sun[1]+nz*sun[2]);
+   const strength=state.night?(group.emission?1:.48):1;
+   const rr=Math.min(255,Math.round(a[i+6]*factor*255*strength)),gg=Math.min(255,Math.round(a[i+7]*factor*255*strength)),bb=Math.min(255,Math.round(a[i+8]*factor*255*strength));
+   const color=(255<<24)|(bb<<16)|(gg<<8)|rr,alpha=a[i+9],backAlpha=1-alpha;
+   for(let j=1;j<poly.length-1;j++){
+    const [x0,y0,z0]=project(poly[0]),[x1,y1,z1]=project(poly[j]),[x2,y2,z2]=project(poly[j+1]);
+    const dx1=x1-x0,dx2=x2-x0,dy1=y1-y0,dy2=y2-y0,den=dx1*dy2-dy1*dx2;if(Math.abs(den)<.0001)continue;
+    const xmin=Math.max(0,Math.ceil(Math.min(x0,x1,x2)-.5)),xmax=Math.min(w-1,Math.floor(Math.max(x0,x1,x2)-.5));
+    const ymin=Math.max(0,Math.ceil(Math.min(y0,y1,y2)-.5)),ymax=Math.min(h-1,Math.floor(Math.max(y0,y1,y2)-.5));if(xmax<xmin||ymax<ymin)continue;
+    const du=dy2/den,dv=-dy1/den,dz=du*(z1-z0)+dv*(z2-z0);
+    for(let y=ymin;y<=ymax;y++){
+     const dx=xmin+.5-x0,dy=y+.5-y0;let u=(dx*dy2-dy*dx2)/den,t=(dx1*dy-dy1*dx)/den,z=z0+u*(z1-z0)+t*(z2-z0),idx=y*w+xmin;
+     for(let x=xmin;x<=xmax;x++,idx++,u+=du,t+=dv,z+=dz){
+      if(u<-.000001||t<-.000001||u+t>1.000001||z+1e-6<softDepth[idx])continue;
+      if(alpha>=.99){softDepth[idx]=z;pixels[idx]=color}
+      else{const c=pixels[idx];pixels[idx]=(255<<24)|((bb*alpha+((c>>>16)&255)*backAlpha)<<16)|((gg*alpha+((c>>>8)&255)*backAlpha)<<8)|(rr*alpha+(c&255)*backAlpha)}
+     }
+    }
+   }
+  }
+ }
+ ctx.putImageData(softFrame,0,0);
+}
 
 new ResizeObserver(schedule).observe(stage);new ResizeObserver(sheetDraw).observe(paper);floorChanged('all');
 
