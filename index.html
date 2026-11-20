@@ -13,6 +13,7 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--paper);c
 @media(max-width:780px){header{padding:13px 15px;gap:12px}.stagebar{top:12px;right:12px}.tools{right:12px;bottom:12px}.scale{left:15px;bottom:14px}.bar{padding:11px 12px}.hint{display:none}.seg{width:100%;justify-content:center}.seg button{padding:9px 13px}.project-id{display:none}}
 @media(max-width:520px){header .brand{width:28px;height:28px}.address{font-size:11px}.infoWord{display:none}#infoBtn{padding:7px;min-width:35px}.outline{font-size:12px;min-height:34px;padding:7px 9px;gap:5px}.stagebar{gap:4px;left:7px;right:7px;justify-content:flex-end;flex-wrap:wrap}.seg button{flex:1;padding:9px 4px;font-size:12px}.bar{padding:9px 7px max(9px,env(safe-area-inset-bottom))}.dialoghead{padding:10px}.sheetfoot .helpsheet{display:none}}
 @media(max-height:365px){header{padding:6px 12px}.bar{padding:5px}.seg button{padding:6px 10px}.hint{display:none}.stagebar{top:5px;right:8px}.tools{right:8px;bottom:6px}.address{margin-top:2px}#app{min-height:195px}#stage{min-height:60px}}
+#walkHud{position:absolute;z-index:3;left:16px;bottom:18px;display:flex;gap:14px;align-items:flex-end;pointer-events:none}#walkHud[hidden]{display:none!important}.walk-help{background:#111c25df;color:#fff;padding:9px 12px;border-radius:7px;font-size:12px;line-height:1.5}.walk-pad{display:grid;justify-items:center;gap:3px;pointer-events:auto;touch-action:none}.walk-pad div{display:flex;gap:3px}.walk-help button{pointer-events:auto;cursor:pointer;border:1px solid #ffffff70;background:#253e48;color:#fff;border-radius:5px;padding:3px 8px;margin-top:5px}.walk-pad button{color:#fff;border:1px solid #ffffff70;background:#192c36df;border-radius:7px;width:44px;height:44px;font-size:19px;touch-action:none}.walking .scale{display:none}@media(max-width:600px){#walkHud{left:8px;bottom:8px;gap:5px}.walk-help{font-size:10px;max-width:145px}.walk-pad button{width:40px;height:40px}}
 </style>
 </head><body>
 <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
@@ -72,8 +73,9 @@ for(const mesh of data){
  const wood=mesh.kind==='deck'?1:(mesh.kind==='pergola_wood'||(mesh.kind==='pergola' && mesh.name && mesh.name.includes('доск')))?2:(mesh.kind==='timber'||mesh.kind==='wood')?3:0;
  const visibleOnFloor=Array.isArray(mesh.visibleOnFloor)?[...new Set(mesh.visibleOnFloor.map(String))].sort():[lev];
  const emission=mesh.kind==='light'||mesh.kind==='facade_light';
- const key=[lev,visibleOnFloor.join(','),alpha<.99,brick,roof,wood,emission].join('-');
- const group=grouped.get(key)||{level:lev,visibleOnFloor,transparent:alpha<.99,brick,roof,wood,emission,packed:[]};grouped.set(key,group);
+ const walkHidden=mesh.kind==='door';
+ const key=[lev,visibleOnFloor.join(','),alpha<.99,brick,roof,wood,emission,walkHidden].join('-');
+ const group=grouped.get(key)||{level:lev,visibleOnFloor,transparent:alpha<.99,brick,roof,wood,emission,walkHidden,packed:[]};grouped.set(key,group);
  let polygons=mesh.faces||[];if(polygons.length && !Array.isArray(polygons[0]))polygons=Array.from({length:polygons.length/3},(_,i)=>polygons.slice(i*3,i*3+3));
  const c=rgb(mesh.color),packed=group.packed;
  for(const poly of polygons){for(let j=1;j<poly.length-1;j++){
@@ -141,9 +143,10 @@ function activeGroups(){
  if(state.level==='all')return groups;
  return state.cutaway?cutGroups(state.level):fullFloors.get(state.level);
 }
-function updateSize(){const r=stage.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,gl?2:1.5);const w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));if(w!==canvas.width||h!==canvas.height){canvas.width=w;canvas.height=h}return {w:r.width,h:r.height}}
+function updateSize(){const r=stage.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,gl?2:1.5);const walkDpr=(!gl&&walkState.active)?Math.min(dpr,720/Math.max(1,r.width)):dpr;const w=Math.max(1,Math.round(r.width*walkDpr)),h=Math.max(1,Math.round(r.height*walkDpr));if(w!==canvas.width||h!==canvas.height){canvas.width=w;canvas.height=h}return {w:r.width,h:r.height}}
 function basis(dir,top=false){const right=top?[1,0,0]:unit(cross([0,0,1],dir)),up=unit(cross(dir,right));return {right,up,dir}}
 function getView(w,h){
+ if(walkState.active)return walkView(w,h);
  const visible=activeGroups(),b=boundsFor(visible),single=state.level!=='all';
  const viewDir=state.top?[0,0,1]:[Math.cos(state.az)*Math.cos(state.el),Math.sin(state.az)*Math.cos(state.el),Math.sin(state.el)];
  const v=basis(viewDir,state.top);let halfX=0,halfY=0;
@@ -161,11 +164,13 @@ function getView(w,h){
 const vertexSource=`
 attribute vec3 position,normal,color;attribute float alpha;
 uniform vec3 origin,rightAxis,upAxis,eyeAxis,sunRight,sunUp,sunDir,sunOrigin;
-uniform vec2 scale,offset;uniform float depthScale,sunSize,ground,groundHeight;
+uniform vec2 scale,offset;uniform float depthScale,sunSize,ground,groundHeight,walkMode,walkAspect;
 varying vec3 pos,norm,tint,lightPos;varying float opacity;
 void main(){
  pos=vec3(position.xy,ground>.5?groundHeight:position.z);norm=normal;tint=color;opacity=alpha;
- vec3 rel=pos-origin;gl_Position=vec4(dot(rel,rightAxis)*scale.x+offset.x,dot(rel,upAxis)*scale.y+offset.y,-dot(rel,eyeAxis)*depthScale,1.);
+ vec3 rel=pos-origin;
+ if(walkMode>.5){float depth=-dot(rel,eyeAxis);float nearZ=.08,farZ=180.;float zoom=1.35;gl_Position=vec4(dot(rel,rightAxis)*zoom/walkAspect,dot(rel,upAxis)*zoom,((farZ+nearZ)/(farZ-nearZ))*depth-(2.*farZ*nearZ)/(farZ-nearZ),depth);}
+ else{gl_Position=vec4(dot(rel,rightAxis)*scale.x+offset.x,dot(rel,upAxis)*scale.y+offset.y,-dot(rel,eyeAxis)*depthScale,1.);}
  vec3 lp=(pos-sunOrigin)/sunSize;lightPos=vec3(dot(lp,sunRight),dot(lp,sunUp),-dot(lp,sunDir))*.5+.5;
 }`;
 const fragmentSource=`
@@ -279,7 +284,7 @@ function renderGL(v){
  gl.viewport(0,0,canvas.width,canvas.height);if(state.night)gl.clearColor(.055,.085,.14,1);else gl.clearColor(.918,.931,.897,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
  gl.useProgram(program.p);const u=program.u;
  gl.uniform3fv(u.rightAxis,v.right);gl.uniform3fv(u.upAxis,v.up);gl.uniform3fv(u.eyeAxis,v.dir);gl.uniform3fv(u.origin,v.origin);gl.uniform2f(u.scale,2*v.scale/v.w,2*v.scale/v.h);gl.uniform2f(u.offset,2*v.ox/v.w-1,1-2*v.oy/v.h);gl.uniform1f(u.depthScale,1/(diag*7));
- gl.uniform3fv(u.sunRight,light.right);gl.uniform3fv(u.sunUp,light.up);gl.uniform3fv(u.sunDir,sun);gl.uniform3fv(u.sunOrigin,center);gl.uniform1f(u.groundHeight,v.b.min[2]-.04);gl.uniform1f(u.sunSize,size);gl.uniform1f(u.shadowTexel,1/shadowSize);gl.uniform1f(u.useShadow,fb?1:0);gl.uniform1f(u.night,state.night?1:0);
+ gl.uniform1f(u.walkMode,v.perspective?1:0);gl.uniform1f(u.walkAspect,v.w/v.h);gl.uniform3fv(u.sunRight,light.right);gl.uniform3fv(u.sunUp,light.up);gl.uniform3fv(u.sunDir,sun);gl.uniform3fv(u.sunOrigin,center);gl.uniform1f(u.groundHeight,v.b.min[2]-.04);gl.uniform1f(u.sunSize,size);gl.uniform1f(u.shadowTexel,1/shadowSize);gl.uniform1f(u.useShadow,fb?1:0);gl.uniform1f(u.night,state.night?1:0);
  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,shadowTex);gl.uniform1i(u.shadow,0);
  gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
  for(const g of [ground,...v.visible]){gl.uniform1f(u.ground,g.ground?1:0);gl.uniform1f(u.masonry,g.brick?1:0);gl.uniform1f(u.wood,g.wood||0);gl.uniform1f(u.emission,g.emission?1:0);gl.uniform1f(u.pxPerMetre,v.scale);if(g.transparent){gl.enable(gl.BLEND);gl.depthMask(false)}else{gl.disable(gl.BLEND);gl.depthMask(true)}bindGroup(program,g);gl.drawArrays(gl.TRIANGLES,0,g.count)}
@@ -364,7 +369,7 @@ function renderSoft(v){
 function initSoft(){const fresh=canvas.cloneNode(false);canvas.replaceWith(fresh);canvas=fresh;gl=null;ctx=canvas.getContext('2d')}
 try{initWebGL()}catch(error){initSoft()}
 let queued=false,lastView;
-function draw(){queued=false;const {w,h}=updateSize();if(!w||!h)return;const v=getView(w,h);lastView=v;if(gl)renderGL(v);else renderSoft(v);
+function draw(){queued=false;const {w,h}=updateSize();if(!w||!h)return;const v=getView(w,h);lastView=v;if(gl)renderGL(v);else if(v.perspective)renderWalkSoft(v);else renderSoft(v);
  const preferred=80/v.scale, exponent=Math.pow(10,Math.floor(Math.log10(preferred)));const step=[1,2,5,10].reduce((p,x)=>Math.abs(x*exponent-preferred)<Math.abs(p*exponent-preferred)?x:p,1)*exponent;
  $('scaleText').textContent=step.toLocaleString('ru-RU')+' м';$('scaleLine').style.width=step*v.scale+'px';renderNames(v);
 }
@@ -387,10 +392,11 @@ function setCutaway(enabled){
 $('cutaway').onclick=()=>setCutaway(!state.cutaway);
 $('night').onclick=()=>{state.night=!state.night;$('night').textContent=state.night?'☀ День':'☾ Вечер';$('night').setAttribute('aria-pressed',String(state.night));schedule()};
 function floorChanged(level){
+ if(walkState.active){if(level==='all')level='1';walkPlace(level)}
  state.level=level;$('cutaway').hidden=level==='all';setCutaway(false);state.pan=[0,0];state.zoom=1;state.el=level==='all'?.49:.83;
  document.querySelectorAll('[data-level]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.level===level)));
  $('sheetBtn').hidden=!plans.some(p=>String(p.level)===level);
- $('names').hidden=level==='all'||!labels.some(l=>String(l.level)===level);
+ $('names').hidden=level==='all'||!labels.some(l=>String(l.level)===level);if(walkState.active){$('cutaway').hidden=true;$('names').hidden=true;$('sheetBtn').hidden=true;}
  schedule();
 }
 document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>floorChanged(b.dataset.level));
@@ -406,8 +412,8 @@ function gestures(el,drag,pinch,wheel){
  el.onpointerup=el.onpointercancel=el.onlostpointercapture=e=>{pointers.delete(e.pointerId);segment=between()};
  el.addEventListener('wheel',e=>{e.preventDefault();wheel(Math.exp(-clamp(e.deltaY*(e.deltaMode===1?16:1),-180,180)*.0024),position(e,el))},{passive:false})
 }
-gestures(canvas,(dx,dy,e)=>{if(e.shiftKey||e.buttons===2||state.top){state.pan[0]+=dx;state.pan[1]+=dy}else{state.az-=dx*.008;state.el=clamp(state.el+dy*.007,.075,1.53)}schedule()},(factor,pan,p)=>{moveZoom(factor,p);state.pan[0]+=pan[0];state.pan[1]+=pan[1]},moveZoom);
-canvas.onkeydown=e=>{const step=.11;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','Home'].includes(e.key))e.preventDefault();
+gestures(canvas,(dx,dy,e)=>{if(walkState.active){walkRotate(dx,dy);return}if(e.shiftKey||e.buttons===2||state.top){state.pan[0]+=dx;state.pan[1]+=dy}else{state.az-=dx*.008;state.el=clamp(state.el+dy*.007,.075,1.53)}schedule()},(factor,pan,p)=>{moveZoom(factor,p);state.pan[0]+=pan[0];state.pan[1]+=pan[1]},moveZoom);
+canvas.onkeydown=e=>{if(walkState.active)return;const step=.11;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','Home'].includes(e.key))e.preventDefault();
  if(e.key==='+'||e.key==='=')moveZoom(1.2);if(e.key==='-')moveZoom(1/1.2);if(e.key==='Home')reset();
  if(e.key.startsWith('Arrow')){if(state.top){state.pan[0]+=(Number(e.key==='ArrowRight')-Number(e.key==='ArrowLeft'))*25;state.pan[1]+=(Number(e.key==='ArrowDown')-Number(e.key==='ArrowUp'))*25}else{state.az+=(Number(e.key==='ArrowLeft')-Number(e.key==='ArrowRight'))*step;state.el=clamp(state.el+(Number(e.key==='ArrowUp')-Number(e.key==='ArrowDown'))*step,.075,1.53)}schedule()}};
 const sheet=$('sheet'), paper=$('paperwrap'),sheetImage=$('sheetImage');let sheetZoom=1,sheetPan=[0,0];
@@ -426,6 +432,131 @@ gestures(paper,(dx,dy)=>{sheetPan[0]+=dx;sheetPan[1]+=dy;sheetDraw()},(f,pan,p)=
 $('sheetMinus').onclick=()=>sheetScale(.8);$('sheetPlus').onclick=()=>sheetScale(1.25);$('sheetFit').onclick=()=>{sheetPan=[0,0];sheetZoom=1;sheetDraw()};
 if(model.notes?.length){const title=document.createElement('h3');title.textContent='Особенности модели';$('notes').append(title);const ul=document.createElement('ul');for(const msg of model.notes){const li=document.createElement('li');li.textContent=msg;ul.append(li)}$('notes').append(ul)}
 $('infoBtn').onclick=()=>$('info').showModal();document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target!==d)return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close()}));
+// First-person mode; uses the same model and materials as the overview.
+const walkState={active:false,x:0,y:0,z:1.65,yaw:0,pitch:0,keys:new Set(),last:0,frame:0,priorNight:null};
+const walkStarts={1:[32.256,9.979,1.65,0],2:[15.803,6.683,5.45,0],3:[26.747,3.174,8.45,0],terrace:[37.98,1.589,9.30,1.57]};
+// Horizontal collision barriers from the actual extruded wall, column and
+// window geometry. z is floor elevation in metres. The return value means
+// blocked: this matches the viewer's proposed walkCollision(x, y, z) API.
+function makeCollision(data) {
+  const walls=[],floors=[];
+  const chunks=m=>{
+    const v=m.vertices||[],out=[];
+    if (!Array.isArray(v[0]) || v.length%8!==0) return out;
+    for(let i=0;i<v.length;i+=8){
+      const c=v.slice(i,i+8);let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity,zmin=Infinity,zmax=-Infinity;
+      for(const p of c){xmin=Math.min(xmin,p[0]);xmax=Math.max(xmax,p[0]);ymin=Math.min(ymin,p[1]);ymax=Math.max(ymax,p[1]);zmin=Math.min(zmin,p[2]);zmax=Math.max(zmax,p[2])}
+      if(xmax-xmin>0.001&&ymax-ymin>0.001&&zmax-zmin>0.001)out.push([xmin,xmax,ymin,ymax,zmin,zmax]);
+    }
+    return out;
+  };
+  for(const m of data){
+    if(['wall','column','exterior','glass','seat','furniture','stage'].includes(m.kind))walls.push(...chunks(m));
+    if(m.kind==='slab'||m.kind==='terrace')floors.push(...chunks(m));
+  }
+  // A narrow radius allows standard doorways while preventing wall clipping.
+  const radius=.18;
+  const collides=(x,y,z)=>{
+    if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(z))return true;
+    // Stay on a modelled floor; slab partitions overlap at boundaries.
+    const supported=floors.some(b=>Math.abs(b[5]-z)<.09&&x>=b[0]&&x<=b[1]&&y>=b[2]&&y<=b[3]);
+    if(!supported)return true;
+    return walls.some(b=>{
+      if(b[5]<=z+.18||b[4]>=z+1.75)return false;
+      const dx=Math.max(b[0]-x,0,x-b[1]),dy=Math.max(b[2]-y,0,y-b[3]);
+      return dx*dx+dy*dy<radius*radius;
+    });
+  };
+  return collides;
+}
+
+const walkCollision=makeCollision(data);
+const walkVisible=groups.filter(g=>!g.walkHidden);
+const walkButton=document.createElement('button');
+walkButton.id='walkButton';walkButton.className='outline';walkButton.type='button';walkButton.textContent='🚶 Прогулка';walkButton.setAttribute('aria-pressed','false');
+$('above').before(walkButton);
+const walkHud=document.createElement('div');walkHud.id='walkHud';walkHud.hidden=true;
+walkHud.innerHTML='<div class="walk-help">Перетаскивайте изображение, чтобы осмотреться<br><b>W A S D</b> или стрелки — движение · выберите этаж внизу<br><button type="button" data-walk-terrace>Терраса</button></div><div class="walk-pad" aria-label="Управление движением"><button data-walk="forward" aria-label="Вперёд">▲</button><div><button data-walk="left" aria-label="Влево">◀</button><button data-walk="back" aria-label="Назад">▼</button><button data-walk="right" aria-label="Вправо">▶</button></div></div>';
+stage.append(walkHud);
+function walkPlace(level){
+ const p=walkStarts[level]||walkStarts[1];walkState.x=p[0];walkState.y=p[1];walkState.z=p[2];walkState.yaw=p[3];walkState.pitch=0;walkState.keys.clear();walkState.last=0;
+}
+function walkOn(){
+ if(state.level==='all')floorChanged('1');
+ walkState.active=true;walkState.priorNight=state.night;state.night=false;$('night').textContent='☾ Вечер';$('night').setAttribute('aria-pressed','false');
+ state.top=false;state.cutaway=false;state.names=false;walkPlace(state.level);walkHud.hidden=false;walkButton.textContent='↩ Общий вид';walkButton.setAttribute('aria-pressed','true');$('above').hidden=true;$('cutaway').hidden=true;$('names').hidden=true;$('sheetBtn').hidden=true;stage.classList.add('walking');schedule();
+}
+function walkOff(){
+ walkState.active=false;walkState.keys.clear();walkHud.hidden=true;walkButton.textContent='🚶 Прогулка';walkButton.setAttribute('aria-pressed','false');$('above').hidden=false;stage.classList.remove('walking');
+ if(walkState.priorNight!==null){state.night=walkState.priorNight;$('night').textContent=state.night?'☀ День':'☾ Вечер';$('night').setAttribute('aria-pressed',String(state.night))}
+ floorChanged('all');reset();schedule();
+}
+walkButton.onclick=()=>walkState.active?walkOff():walkOn();
+function walkView(w,h){
+ const cp=Math.cos(walkState.pitch),forward=[Math.cos(walkState.yaw)*cp,Math.sin(walkState.yaw)*cp,Math.sin(walkState.pitch)];
+ const dir=forward.map(t=>-t),v=basis(dir),origin=[walkState.x,walkState.y,walkState.z],visible=walkVisible;
+ return {...v,origin,scale:Math.max(40,h*.7),ox:w/2,oy:h/2,w,h,single:false,visible,b:total,perspective:true,project(p){const rel=sub(p,origin),depth=dot(rel,forward);return [w/2+dot(rel,v.right)*h*.7/depth,h/2-dot(rel,v.up)*h*.7/depth,depth]}};
+}
+function walkRotate(dx,dy){walkState.yaw+=dx*.005;walkState.pitch=clamp(walkState.pitch-dy*.004,-1.15,1.15);schedule()}
+function walkMove(forward,side,dt){
+ const mag=Math.hypot(forward,side);if(!mag)return;
+ const speed=2.4*Math.min(dt,.05)/Math.max(1,mag),cx=Math.cos(walkState.yaw),cy=Math.sin(walkState.yaw);
+ const dx=(forward*cx+side*cy)*speed,dy=(forward*cy-side*cx)*speed;
+ const nx=walkState.x+dx,ny=walkState.y+dy;
+ if(!walkCollision(nx,walkState.y,walkState.z-1.65))walkState.x=nx;
+ if(!walkCollision(walkState.x,ny,walkState.z-1.65))walkState.y=ny;
+ schedule();
+}
+function walkTick(time){
+ walkState.frame=0;if(!walkState.active||!walkState.keys.size){walkState.last=0;return}
+ const dt=walkState.last?Math.min((time-walkState.last)/1000,.05):0;walkState.last=time;
+ const k=walkState.keys,forward=Number(k.has('forward')||k.has('w')||k.has('ц')||k.has('arrowup'))-Number(k.has('back')||k.has('s')||k.has('ы')||k.has('arrowdown'));
+ const side=Number(k.has('right')||k.has('d')||k.has('в')||k.has('arrowright'))-Number(k.has('left')||k.has('a')||k.has('ф')||k.has('arrowleft'));
+ walkMove(forward,side,dt);walkState.frame=requestAnimationFrame(walkTick);
+}
+function walkKey(key,down){if(down)walkState.keys.add(key);else walkState.keys.delete(key);if(down&&!walkState.frame)walkState.frame=requestAnimationFrame(walkTick)}
+window.addEventListener('keydown',e=>{if(!walkState.active||e.target.closest?.('input,textarea,select'))return;const key=e.key.toLowerCase();if(['w','a','s','d','ц','ф','ы','в','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){e.preventDefault();e.stopImmediatePropagation();walkKey(key,true)}if(key==='escape'){e.preventDefault();walkOff()}},true);
+window.addEventListener('keyup',e=>{if(walkState.active)walkKey(e.key.toLowerCase(),false)},true);
+window.addEventListener('blur',()=>{walkState.keys.clear();walkState.last=0});
+walkHud.querySelector('[data-walk-terrace]').onclick=()=>{floorChanged('3');walkPlace('terrace');schedule()};
+walkHud.querySelectorAll('[data-walk]').forEach(button=>{const key=button.dataset.walk;button.addEventListener('pointerdown',e=>{e.preventDefault();button.setPointerCapture(e.pointerId);walkKey(key,true)});for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>walkKey(key,false))});
+// Perspective software fallback for devices without WebGL. Clip triangles at
+// the near plane before projection and interpolate reciprocal depth per pixel.
+function renderWalkSoft(v){
+ const w=canvas.width,h=canvas.height;
+ if(!softFrame||softFrame.width!==w||softFrame.height!==h){softFrame=ctx.createImageData(w,h);softDepth=new Float32Array(w*h)}
+ const pixels=new Uint32Array(softFrame.data.buffer);pixels.fill(state.night?0xff24160e:0xffdededb);softDepth.fill(-Infinity);
+ const near=.08,focal=h*.675,origin=v.origin,right=v.right,up=v.up,back=v.dir;
+ const camera=(a,i)=>{const x=a[i]-origin[0],y=a[i+1]-origin[1],z=a[i+2]-origin[2];return [x*right[0]+y*right[1]+z*right[2],x*up[0]+y*up[1]+z*up[2],-(x*back[0]+y*back[1]+z*back[2])]};
+ const clip=input=>{const out=[];for(let i=0;i<input.length;i++){const p=input[i],q=input[(i+1)%input.length],pin=p[2]>=near,qin=q[2]>=near;if(pin)out.push(p);if(pin!==qin){const t=(near-p[2])/(q[2]-p[2]);out.push([p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t,near])}}return out};
+ const project=p=>[w*.5+p[0]*focal/p[2],h*.5-p[1]*focal/p[2],1/p[2]];
+ for(const group of v.visible){const a=group.packed;
+  for(let i=0;i<a.length;i+=30){
+   const poly=clip([camera(a,i),camera(a,i+10),camera(a,i+20)]);if(poly.length<3)continue;
+   const nx=a[i+3],ny=a[i+4],nz=a[i+5],factor=.72+.12*Math.max(nz,0)+.14*Math.max(0,nx*sun[0]+ny*sun[1]+nz*sun[2]);
+   const strength=state.night?(group.emission?1:.48):1;
+   const rr=Math.min(255,Math.round(a[i+6]*factor*255*strength)),gg=Math.min(255,Math.round(a[i+7]*factor*255*strength)),bb=Math.min(255,Math.round(a[i+8]*factor*255*strength));
+   const color=(255<<24)|(bb<<16)|(gg<<8)|rr,alpha=a[i+9],backAlpha=1-alpha;
+   for(let j=1;j<poly.length-1;j++){
+    const [x0,y0,z0]=project(poly[0]),[x1,y1,z1]=project(poly[j]),[x2,y2,z2]=project(poly[j+1]);
+    const dx1=x1-x0,dx2=x2-x0,dy1=y1-y0,dy2=y2-y0,den=dx1*dy2-dy1*dx2;if(Math.abs(den)<.0001)continue;
+    const xmin=Math.max(0,Math.ceil(Math.min(x0,x1,x2)-.5)),xmax=Math.min(w-1,Math.floor(Math.max(x0,x1,x2)-.5));
+    const ymin=Math.max(0,Math.ceil(Math.min(y0,y1,y2)-.5)),ymax=Math.min(h-1,Math.floor(Math.max(y0,y1,y2)-.5));if(xmax<xmin||ymax<ymin)continue;
+    const du=dy2/den,dv=-dy1/den,dz=du*(z1-z0)+dv*(z2-z0);
+    for(let y=ymin;y<=ymax;y++){
+     const dx=xmin+.5-x0,dy=y+.5-y0;let u=(dx*dy2-dy*dx2)/den,t=(dx1*dy-dy1*dx)/den,z=z0+u*(z1-z0)+t*(z2-z0),idx=y*w+xmin;
+     for(let x=xmin;x<=xmax;x++,idx++,u+=du,t+=dv,z+=dz){
+      if(u<-.000001||t<-.000001||u+t>1.000001||z+1e-6<softDepth[idx])continue;
+      if(alpha>=.99){softDepth[idx]=z;pixels[idx]=color}
+      else{const c=pixels[idx];pixels[idx]=(255<<24)|((bb*alpha+((c>>>16)&255)*backAlpha)<<16)|((gg*alpha+((c>>>8)&255)*backAlpha)<<8)|(rr*alpha+(c&255)*backAlpha)}
+     }
+    }
+   }
+  }
+ }
+ ctx.putImageData(softFrame,0,0);
+}
+
 new ResizeObserver(schedule).observe(stage);new ResizeObserver(sheetDraw).observe(paper);floorChanged('all');
 
 // Export with metres as model units and +Y as the glTF vertical axis.
