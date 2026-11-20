@@ -397,10 +397,13 @@ function floorChanged(level){
   walkPlace(level);
  }
  state.level=level;$('cutaway').hidden=level==='all';setCutaway(false);state.pan=[0,0];state.zoom=1;state.el=level==='all'?.49:.83;
- document.querySelectorAll('[data-level]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.level===level)));
+ highlightFloor(level);
  $('sheetBtn').hidden=!plans.some(p=>String(p.level)===level);
  $('names').hidden=level==='all'||!labels.some(l=>String(l.level)===level);if(walkState.active){$('cutaway').hidden=true;$('names').hidden=true;$('sheetBtn').hidden=true;}
  schedule();
+}
+function highlightFloor(level){
+ document.querySelectorAll('[data-level]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.level===level)));
 }
 document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>floorChanged(b.dataset.level));
 $('plus').onclick=()=>moveZoom(1.25);$('minus').onclick=()=>moveZoom(.8);$('fit').onclick=reset;
@@ -436,13 +439,14 @@ $('sheetMinus').onclick=()=>sheetScale(.8);$('sheetPlus').onclick=()=>sheetScale
 if(model.notes?.length){const title=document.createElement('h3');title.textContent='Особенности модели';$('notes').append(title);const ul=document.createElement('ul');for(const msg of model.notes){const li=document.createElement('li');li.textContent=msg;ul.append(li)}$('notes').append(ul)}
 $('infoBtn').onclick=()=>$('info').showModal();document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target!==d)return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close()}));
 // First-person mode; uses the same model and materials as the overview.
-const walkState={active:false,x:0,y:0,z:1.65,yaw:0,pitch:0,keys:new Set(),last:0,frame:0,priorNight:null};
+const WALK_EYE_HEIGHT=1.65;
+const WALK_MAX_STEP=.20;
+const walkState={active:false,x:0,y:0,z:WALK_EYE_HEIGHT,foot:0,yaw:0,pitch:0,keys:new Set(),last:0,frame:0,priorNight:null};
 const walkStarts={1:[32.256,9.979,1.65,0],2:[15.803,6.683,5.45,0],3:[26.747,3.174,8.45,0],terrace:[37.98,1.589,9.30,1.57]};
-// Horizontal collision barriers from the actual extruded wall, column and
-// window geometry. z is floor elevation in metres. The return value means
-// blocked: this matches the viewer's proposed walkCollision(x, y, z) API.
-function makeCollision(data) {
-  const walls=[],floors=[];
+// Approach points face the first tread on either side of the internal staircase.
+const stairStarts={1:[29.27,20.0,1.65,Math.PI/2],2:[27.47,19.38,5.45,Math.PI/2]};
+function makeWalkSurface(data) {
+  const walls=[],surfaces=[],steps=[];
   const chunks=m=>{
     const v=m.vertices||[],out=[];
     if (!Array.isArray(v[0]) || v.length%8!==0) return out;
@@ -455,32 +459,39 @@ function makeCollision(data) {
   };
   for(const m of data){
     if(['wall','column','exterior','glass','seat','furniture','stage'].includes(m.kind))walls.push(...chunks(m));
-    if(m.kind==='slab'||m.kind==='terrace')floors.push(...chunks(m));
+    if(m.kind==='slab'||m.kind==='terrace')surfaces.push(...chunks(m));
+    if(m.kind==='stairs'&&m.name.startsWith('Лестница Л1'))steps.push(...chunks(m));
   }
-  // A narrow radius allows standard doorways while preventing wall clipping.
+  surfaces.push(...steps);
+  // Stay within a step of the current elevation so overlapping floors cannot
+  // move the viewer upward or drop them through the staircase opening.
   const radius=.18;
-  const collides=(x,y,z)=>{
-    if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(z))return true;
-    // Stay on a modelled floor; slab partitions overlap at boundaries.
-    const supported=floors.some(b=>Math.abs(b[5]-z)<.09&&x>=b[0]&&x<=b[1]&&y>=b[2]&&y<=b[3]);
-    if(!supported)return true;
-    return walls.some(b=>{
-      if(b[5]<=z+.18||b[4]>=z+1.75)return false;
+  return (x,y,currentHeight)=>{
+    let height=null;
+    for(const b of surfaces){
+      const top=b[5];
+      if(Math.abs(top-currentHeight)<=WALK_MAX_STEP&&x>=b[0]&&x<=b[1]&&y>=b[2]&&y<=b[3]&&(height===null||top>height))height=top;
+    }
+    if(height===null)return null;
+    const intersects=(b,stepHeight)=>{
+      if(b[5]<=height+stepHeight||b[4]>=height+1.75)return false;
       const dx=Math.max(b[0]-x,0,x-b[1]),dy=Math.max(b[2]-y,0,y-b[3]);
       return dx*dx+dy*dy<radius*radius;
-    });
+    };
+    if(walls.some(b=>intersects(b,.18))||steps.some(b=>intersects(b,WALK_MAX_STEP)))return null;
+    return height;
   };
-  return collides;
 }
 
-const walkCollision=makeCollision(data);
+const walkSurface=makeWalkSurface(data);
 const walkVisible=groups.filter(g=>!g.walkHidden);
 const walkButton=document.createElement('button');
 walkButton.id='walkButton';walkButton.className='outline';walkButton.type='button';walkButton.textContent='🚶 Прогулка';walkButton.setAttribute('aria-pressed','false');
 $('above').before(walkButton);
 const walkHud=document.createElement('div');walkHud.id='walkHud';walkHud.hidden=true;
-walkHud.innerHTML='<div class="walk-help">Перетаскивайте изображение, чтобы осмотреться<br><b>W A S D</b> или стрелки — движение · выберите этаж внизу<br><button type="button" data-walk-terrace>Терраса</button> <button type="button" data-walk-mouse hidden>Управление мышью</button><div data-walk-status role="status"></div></div><div class="walk-pad" aria-label="Управление движением"><button data-walk="forward" aria-label="Вперёд">▲</button><div><button data-walk="left" aria-label="Влево">◀</button><button data-walk="back" aria-label="Назад">▼</button><button data-walk="right" aria-label="Вправо">▶</button></div></div>';
+walkHud.innerHTML='<div class="walk-help">Перетаскивайте изображение, чтобы осмотреться<br><b>W A S D</b> или стрелки — движение<br><button type="button" data-walk-stairs>К лестнице</button> <button type="button" data-walk-terrace>Терраса</button> <button type="button" data-walk-mouse hidden>Управление мышью</button><div data-walk-status role="status"></div></div><div class="walk-pad" aria-label="Управление движением"><button data-walk="forward" aria-label="Вперёд">▲</button><div><button data-walk="left" aria-label="Влево">◀</button><button data-walk="back" aria-label="Назад">▼</button><button data-walk="right" aria-label="Вправо">▶</button></div></div>';
 stage.append(walkHud);
+const walkStairs=walkHud.querySelector('[data-walk-stairs]');
 const walkMouse=walkHud.querySelector('[data-walk-mouse]');
 const walkStatus=walkHud.querySelector('[data-walk-status]');
 walkMouse.hidden=typeof canvas.requestPointerLock!=='function';
@@ -509,9 +520,18 @@ document.addEventListener('mousemove',event=>{
  if(walkState.active&&document.pointerLockElement===canvas)
   walkRotate(-event.movementX,event.movementY);
 });
-function walkPlace(level){
- const p=walkStarts[level]||walkStarts[1];walkState.x=p[0];walkState.y=p[1];walkState.z=p[2];walkState.yaw=p[3];walkState.pitch=0;walkState.keys.clear();walkState.last=0;
+function walkPlace(level,position=walkStarts[level]||walkStarts[1]){
+ [walkState.x,walkState.y,walkState.z,walkState.yaw]=position;
+ walkState.foot=walkState.z-WALK_EYE_HEIGHT;
+ walkState.pitch=0;
+ walkState.keys.clear();
+ walkState.last=0;
+ walkStairs.hidden=!stairStarts[level];
 }
+walkStairs.onclick=()=>{
+ const position=stairStarts[state.level];
+ if(position){walkPlace(state.level,position);schedule()}
+};
 function walkOn(){
  if(state.level==='all')floorChanged('1');
  walkState.active=true;walkState.priorNight=state.night;state.night=false;$('night').textContent='☾ Вечер';$('night').setAttribute('aria-pressed','false');
@@ -534,16 +554,34 @@ function walkMove(forward,side,dt){
  const speed=2.4*Math.min(dt,.05)/Math.max(1,mag),cx=Math.cos(walkState.yaw),cy=Math.sin(walkState.yaw);
  const dx=(forward*cx+side*cy)*speed,dy=(forward*cy-side*cx)*speed;
  const nx=walkState.x+dx,ny=walkState.y+dy;
- if(!walkCollision(nx,walkState.y,walkState.z-1.65))walkState.x=nx;
- if(!walkCollision(walkState.x,ny,walkState.z-1.65))walkState.y=ny;
+ const stepX=walkSurface(nx,walkState.y,walkState.foot);
+ if(stepX!==null){walkState.x=nx;walkState.foot=stepX}
+ const stepY=walkSurface(walkState.x,ny,walkState.foot);
+ if(stepY!==null){walkState.y=ny;walkState.foot=stepY}
+ // On reaching a floor, update its tab without teleporting the viewer.
+ for(const level of ['1','2']){
+  if(state.level!==level&&Math.abs(walkState.foot-nominalFloor[level])<.01){
+   state.level=level;
+   highlightFloor(level);
+   walkStairs.hidden=false;
+  }
+ }
  schedule();
 }
 function walkTick(time){
- walkState.frame=0;if(!walkState.active||!walkState.keys.size){walkState.last=0;return}
+ walkState.frame=0;if(!walkState.active){walkState.last=0;return}
  const dt=walkState.last?Math.min((time-walkState.last)/1000,.05):0;walkState.last=time;
  const k=walkState.keys,forward=Number(k.has('forward')||k.has('w')||k.has('ц')||k.has('arrowup'))-Number(k.has('back')||k.has('s')||k.has('ы')||k.has('arrowdown'));
  const side=Number(k.has('right')||k.has('d')||k.has('в')||k.has('arrowright'))-Number(k.has('left')||k.has('a')||k.has('ф')||k.has('arrowleft'));
- walkMove(forward,side,dt);walkState.frame=requestAnimationFrame(walkTick);
+ walkMove(forward,side,dt);
+ const target=walkState.foot+WALK_EYE_HEIGHT;
+ if(walkState.z!==target){
+  const offset=walkState.z-target;
+  walkState.z=Math.abs(offset)<.006?target:target+offset*Math.exp(-dt*18);
+  schedule();
+ }
+ if(k.size||walkState.z!==target)walkState.frame=requestAnimationFrame(walkTick);
+ else walkState.last=0;
 }
 function walkKey(key,down){if(down)walkState.keys.add(key);else walkState.keys.delete(key);if(down&&!walkState.frame)walkState.frame=requestAnimationFrame(walkTick)}
 window.addEventListener('keydown',e=>{if(!walkState.active||e.target.closest?.('input,textarea,select'))return;const key=e.key.toLowerCase();if(['w','a','s','d','ц','ф','ы','в','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){e.preventDefault();e.stopImmediatePropagation();walkKey(key,true)}if(key==='escape'&&document.pointerLockElement!==canvas){e.preventDefault();walkOff()}},true);
