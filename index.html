@@ -13,7 +13,7 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--paper);c
 @media(max-width:780px){header{padding:13px 15px;gap:12px}.stagebar{top:12px;right:12px}.tools{right:12px;bottom:12px}.scale{left:15px;bottom:14px}.bar{padding:11px 12px}.hint{display:none}.seg{width:100%;justify-content:center}.seg button{padding:9px 13px}.project-id{display:none}}
 @media(max-width:520px){header .brand{width:28px;height:28px}.address{font-size:11px}.infoWord{display:none}#infoBtn{padding:7px;min-width:35px}.outline{font-size:12px;min-height:34px;padding:7px 9px;gap:5px}.stagebar{gap:4px;left:7px;right:7px;justify-content:flex-end;flex-wrap:wrap}.seg button{flex:1;padding:9px 4px;font-size:12px}.bar{padding:9px 7px max(9px,env(safe-area-inset-bottom))}.dialoghead{padding:10px}.sheetfoot .helpsheet{display:none}}
 @media(max-height:365px){header{padding:6px 12px}.bar{padding:5px}.seg button{padding:6px 10px}.hint{display:none}.stagebar{top:5px;right:8px}.tools{right:8px;bottom:6px}.address{margin-top:2px}#app{min-height:195px}#stage{min-height:60px}}
-#walkHud{position:absolute;z-index:3;left:16px;bottom:18px;display:flex;gap:14px;align-items:flex-end;pointer-events:none}#walkHud[hidden]{display:none!important}.walk-help{background:#111c25df;color:#fff;padding:9px 12px;border-radius:7px;font-size:12px;line-height:1.5}.walk-pad{display:grid;justify-items:center;gap:3px;pointer-events:auto;touch-action:none}.walk-pad div{display:flex;gap:3px}.walk-help button{pointer-events:auto;cursor:pointer;border:1px solid #ffffff70;background:#253e48;color:#fff;border-radius:5px;padding:3px 8px;margin-top:5px}.walk-pad button{color:#fff;border:1px solid #ffffff70;background:#192c36df;border-radius:7px;width:44px;height:44px;font-size:19px;touch-action:none}.walking .scale{display:none}@media(max-width:600px){#walkHud{left:8px;bottom:8px;gap:5px}.walk-help{font-size:10px;max-width:145px}.walk-pad button{width:40px;height:40px}}
+#walkHud{position:absolute;z-index:3;left:16px;bottom:18px;display:flex;gap:14px;align-items:flex-end;pointer-events:none}#walkHud[hidden]{display:none!important}.walk-help{background:#111c25df;color:#fff;padding:9px 12px;border-radius:7px;font-size:12px;line-height:1.5}.walk-pad{display:grid;justify-items:center;gap:3px;pointer-events:auto;touch-action:none}.walk-pad div{display:flex;gap:3px}.walk-help button{pointer-events:auto;cursor:pointer;border:1px solid #ffffff70;background:#253e48;color:#fff;border-radius:5px;padding:3px 8px;margin-top:5px}.walk-pad button{color:#fff;border:1px solid #ffffff70;background:#192c36df;border-radius:7px;width:44px;height:44px;font-size:19px;touch-action:none}.walking .scale,.walking .tools,.walking + .bar .hint{display:none}@media(max-width:600px){#walkHud{left:8px;bottom:8px;gap:5px}.walk-help{font-size:10px;max-width:145px}.walk-pad button{width:40px;height:40px}}
 </style>
 </head><body>
 <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
@@ -392,7 +392,10 @@ function setCutaway(enabled){
 $('cutaway').onclick=()=>setCutaway(!state.cutaway);
 $('night').onclick=()=>{state.night=!state.night;$('night').textContent=state.night?'☀ День':'☾ Вечер';$('night').setAttribute('aria-pressed',String(state.night));schedule()};
 function floorChanged(level){
- if(walkState.active){if(level==='all')level='1';walkPlace(level)}
+ if(walkState.active){
+  if(level==='all'){walkOff();return}
+  walkPlace(level);
+ }
  state.level=level;$('cutaway').hidden=level==='all';setCutaway(false);state.pan=[0,0];state.zoom=1;state.el=level==='all'?.49:.83;
  document.querySelectorAll('[data-level]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.level===level)));
  $('sheetBtn').hidden=!plans.some(p=>String(p.level)===level);
@@ -412,7 +415,7 @@ function gestures(el,drag,pinch,wheel){
  el.onpointerup=el.onpointercancel=el.onlostpointercapture=e=>{pointers.delete(e.pointerId);segment=between()};
  el.addEventListener('wheel',e=>{e.preventDefault();wheel(Math.exp(-clamp(e.deltaY*(e.deltaMode===1?16:1),-180,180)*.0024),position(e,el))},{passive:false})
 }
-gestures(canvas,(dx,dy,e)=>{if(walkState.active){walkRotate(dx,dy);return}if(e.shiftKey||e.buttons===2||state.top){state.pan[0]+=dx;state.pan[1]+=dy}else{state.az-=dx*.008;state.el=clamp(state.el+dy*.007,.075,1.53)}schedule()},(factor,pan,p)=>{moveZoom(factor,p);state.pan[0]+=pan[0];state.pan[1]+=pan[1]},moveZoom);
+gestures(canvas,(dx,dy,e)=>{if(walkState.active){if(document.pointerLockElement!==canvas)walkRotate(dx,dy);return}if(e.shiftKey||e.buttons===2||state.top){state.pan[0]+=dx;state.pan[1]+=dy}else{state.az-=dx*.008;state.el=clamp(state.el+dy*.007,.075,1.53)}schedule()},(factor,pan,p)=>{moveZoom(factor,p);state.pan[0]+=pan[0];state.pan[1]+=pan[1]},moveZoom);
 canvas.onkeydown=e=>{if(walkState.active)return;const step=.11;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','Home'].includes(e.key))e.preventDefault();
  if(e.key==='+'||e.key==='=')moveZoom(1.2);if(e.key==='-')moveZoom(1/1.2);if(e.key==='Home')reset();
  if(e.key.startsWith('Arrow')){if(state.top){state.pan[0]+=(Number(e.key==='ArrowRight')-Number(e.key==='ArrowLeft'))*25;state.pan[1]+=(Number(e.key==='ArrowDown')-Number(e.key==='ArrowUp'))*25}else{state.az+=(Number(e.key==='ArrowLeft')-Number(e.key==='ArrowRight'))*step;state.el=clamp(state.el+(Number(e.key==='ArrowUp')-Number(e.key==='ArrowDown'))*step,.075,1.53)}schedule()}};
@@ -476,8 +479,36 @@ const walkButton=document.createElement('button');
 walkButton.id='walkButton';walkButton.className='outline';walkButton.type='button';walkButton.textContent='🚶 Прогулка';walkButton.setAttribute('aria-pressed','false');
 $('above').before(walkButton);
 const walkHud=document.createElement('div');walkHud.id='walkHud';walkHud.hidden=true;
-walkHud.innerHTML='<div class="walk-help">Перетаскивайте изображение, чтобы осмотреться<br><b>W A S D</b> или стрелки — движение · выберите этаж внизу<br><button type="button" data-walk-terrace>Терраса</button></div><div class="walk-pad" aria-label="Управление движением"><button data-walk="forward" aria-label="Вперёд">▲</button><div><button data-walk="left" aria-label="Влево">◀</button><button data-walk="back" aria-label="Назад">▼</button><button data-walk="right" aria-label="Вправо">▶</button></div></div>';
+walkHud.innerHTML='<div class="walk-help">Перетаскивайте изображение, чтобы осмотреться<br><b>W A S D</b> или стрелки — движение · выберите этаж внизу<br><button type="button" data-walk-terrace>Терраса</button> <button type="button" data-walk-mouse hidden>Управление мышью</button><div data-walk-status role="status"></div></div><div class="walk-pad" aria-label="Управление движением"><button data-walk="forward" aria-label="Вперёд">▲</button><div><button data-walk="left" aria-label="Влево">◀</button><button data-walk="back" aria-label="Назад">▼</button><button data-walk="right" aria-label="Вправо">▶</button></div></div>';
 stage.append(walkHud);
+const walkMouse=walkHud.querySelector('[data-walk-mouse]');
+const walkStatus=walkHud.querySelector('[data-walk-status]');
+walkMouse.hidden=typeof canvas.requestPointerLock!=='function';
+const releaseWalkMouse=()=>{
+ if(document.pointerLockElement===canvas)document.exitPointerLock();
+};
+const showWalkMouseError=()=>{
+ if(walkState.active&&document.pointerLockElement!==canvas)
+  walkStatus.textContent='Для поворота взгляда перетаскивайте изображение.';
+};
+walkMouse.onclick=async ()=>{
+ if(!walkState.active)return;
+ if(document.pointerLockElement===canvas){releaseWalkMouse();return}
+ walkStatus.textContent='';
+ try{await canvas.requestPointerLock()}catch(error){showWalkMouseError()}
+};
+document.addEventListener('pointerlockerror',showWalkMouseError);
+document.addEventListener('pointerlockchange',()=>{
+ const locked=document.pointerLockElement===canvas;
+ if(locked&&!walkState.active){releaseWalkMouse();return}
+ walkState.keys.clear();
+ walkMouse.textContent=locked?'Освободить мышь':'Управление мышью';
+ walkStatus.textContent=locked?'Esc — освободить мышь.':'';
+});
+document.addEventListener('mousemove',event=>{
+ if(walkState.active&&document.pointerLockElement===canvas)
+  walkRotate(-event.movementX,event.movementY);
+});
 function walkPlace(level){
  const p=walkStarts[level]||walkStarts[1];walkState.x=p[0];walkState.y=p[1];walkState.z=p[2];walkState.yaw=p[3];walkState.pitch=0;walkState.keys.clear();walkState.last=0;
 }
@@ -487,7 +518,7 @@ function walkOn(){
  state.top=false;state.cutaway=false;state.names=false;walkPlace(state.level);walkHud.hidden=false;walkButton.textContent='↩ Общий вид';walkButton.setAttribute('aria-pressed','true');$('above').hidden=true;$('cutaway').hidden=true;$('names').hidden=true;$('sheetBtn').hidden=true;stage.classList.add('walking');schedule();
 }
 function walkOff(){
- walkState.active=false;walkState.keys.clear();walkHud.hidden=true;walkButton.textContent='🚶 Прогулка';walkButton.setAttribute('aria-pressed','false');$('above').hidden=false;stage.classList.remove('walking');
+ walkState.active=false;releaseWalkMouse();walkState.keys.clear();walkStatus.textContent='';walkHud.hidden=true;walkButton.textContent='🚶 Прогулка';walkButton.setAttribute('aria-pressed','false');$('above').hidden=false;stage.classList.remove('walking');
  if(walkState.priorNight!==null){state.night=walkState.priorNight;$('night').textContent=state.night?'☀ День':'☾ Вечер';$('night').setAttribute('aria-pressed',String(state.night))}
  floorChanged('all');reset();schedule();
 }
@@ -515,7 +546,7 @@ function walkTick(time){
  walkMove(forward,side,dt);walkState.frame=requestAnimationFrame(walkTick);
 }
 function walkKey(key,down){if(down)walkState.keys.add(key);else walkState.keys.delete(key);if(down&&!walkState.frame)walkState.frame=requestAnimationFrame(walkTick)}
-window.addEventListener('keydown',e=>{if(!walkState.active||e.target.closest?.('input,textarea,select'))return;const key=e.key.toLowerCase();if(['w','a','s','d','ц','ф','ы','в','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){e.preventDefault();e.stopImmediatePropagation();walkKey(key,true)}if(key==='escape'){e.preventDefault();walkOff()}},true);
+window.addEventListener('keydown',e=>{if(!walkState.active||e.target.closest?.('input,textarea,select'))return;const key=e.key.toLowerCase();if(['w','a','s','d','ц','ф','ы','в','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){e.preventDefault();e.stopImmediatePropagation();walkKey(key,true)}if(key==='escape'&&document.pointerLockElement!==canvas){e.preventDefault();walkOff()}},true);
 window.addEventListener('keyup',e=>{if(walkState.active)walkKey(e.key.toLowerCase(),false)},true);
 window.addEventListener('blur',()=>{walkState.keys.clear();walkState.last=0});
 walkHud.querySelector('[data-walk-terrace]').onclick=()=>{floorChanged('3');walkPlace('terrace');schedule()};
@@ -557,7 +588,10 @@ function renderWalkSoft(v){
  ctx.putImageData(softFrame,0,0);
 }
 
-new ResizeObserver(schedule).observe(stage);new ResizeObserver(sheetDraw).observe(paper);floorChanged('all');
+new ResizeObserver(schedule).observe(stage);
+new ResizeObserver(sheetDraw).observe(paper);
+floorChanged('all');
+if(new URLSearchParams(location.search).get('walk')==='1')walkOn();
 
 // Export with metres as model units and +Y as the glTF vertical axis.
 function projectGlb(model) {
