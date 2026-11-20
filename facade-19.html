@@ -145,10 +145,11 @@ const departments=[
 ];
 for(const room of departments){
   for(const [x,y] of room.desks)desk(x,y);
-  cabinet(...room.cab);plant(...room.plant,true);painting(...room.art);
+  cabinet(...room.cab);plant(...room.plant,true);
+  if(room.art[1]>.1)painting(...room.art);
   const centre=room.desks[Math.floor(room.desks.length/2)];ceiling(centre[0],centre[1]+.45,1.8);
 }
-meeting(32.8,3.8,3.1);plant(34.8,6.1,true);painting(32.8,.05);ceiling(32.8,6.2,1.7);
+meeting(32.8,3.8,3.1);plant(34.8,6.1,true);painting(35.53,4.8,'x');ceiling(32.8,6.2,1.7);
 meeting(10.6,8.2,1.5);plant(11.5,10.6);painting(10.6,5.47);
 // Storage rooms and archive retain their original purpose.
 for(const [x,y] of [[10.6,1.3],[10.6,4.6],[13.3,3.0],[15.2,3.0],[17.3,3.0],[39,6.2],[40.5,6.2]])cabinet(x,y,1);
@@ -166,7 +167,7 @@ ceiling(22,24.1,1.3);
 // Banquet hall and adjoining public lobby.
 for(const [x,y] of [[2.2,3.2],[2.2,8.4],[2.2,13.6],[6.4,3.2],[6.4,8.4],[6.4,13.6]]) meeting(x,y,2.1);
 for(const [x,y] of [[.5,1],[8.45,1],[.5,16.6],[8.45,16.6],[11.8,18.6],[18.8,18.6]])plant(x,y,true);
-for(const [x,y] of [[2.2,.07],[6.3,.07],[13.2,17.98],[19,17.98]])painting(x,y);
+for(const [x,y] of [[13.2,17.98],[19,17.98]])painting(x,y);
 // A clear corridor receives continuous light and modest wall decoration.
 for(const x of [11.4,14.2,17,20,23,26,29,32,35,38])ceiling(x,10.7,1.1);
 for(const x of [20.4,23,26,29,32,35])painting(x,11.65);
