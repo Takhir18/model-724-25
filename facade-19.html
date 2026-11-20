@@ -1270,6 +1270,8 @@ if(viewParams.get('walk')==='1'||(compactRoute&&viewParams.get('walk')!=='0')){
  walkOn();
  if(view && view.startsWith('office-') && officeViews[view.slice(7)]){
    floorChanged('1');walkPlace('1',officeViews[view.slice(7)]);walkState.pitch=.03;schedule();
+  }else if(view==='stair-railing'){
+   floorChanged('2');walkPlace('2',mezzanineStairStart);walkState.pitch=.12;schedule();
   }else if(view==='worship-team'){
    const portrait=stage.clientWidth/stage.clientHeight<.82;
    const x=portrait?21.45:10.85,y=6.31;
