@@ -385,6 +385,45 @@ function centreSoundRoom() {
   if(label)label.at[1]+=offset;
 }
 centreSoundRoom();
+// Align the mezzanine corridor partitions with the terrace stair and sound booth.
+function alignStairWalls() {
+  const find=(kind,name)=>{
+    const matches=model.meshes.filter(m=>String(m.level)==='3'&&m.kind===kind&&m.name===name);
+    if(matches.length!==1)throw Error('Не найдена геометрия антресоли: '+name);
+    return matches[0];
+  };
+  const walls=find('wall','Перегородки');
+  const doors=find('door','Двери');
+  const skirting=find('interior_stone','Каменный плинтус');
+  const span=8;
+  function translateY(mesh,blocks,amount){
+    for(const block of blocks)for(let i=block*span;i<(block+1)*span;i++){
+      if(!mesh.vertices[i])throw Error('Недостаточно вершин: '+mesh.name+' / '+block);
+      mesh.vertices[i][1]+=amount;
+    }
+  }
+  function changeY(mesh,blocks,from,to){
+    for(const block of blocks)for(let i=block*span;i<(block+1)*span;i++){
+      const p=mesh.vertices[i];
+      if(!p)throw Error('Недостаточно вершин: '+mesh.name+' / '+block);
+      if(Math.abs(p[1]-from)<.0001)p[1]=to;
+    }
+  }
+  // Move the partition and its door to the 9.30 m edge of staircase Л3.
+  translateY(walls,[3,4,5],-.31);
+  translateY(doors,[2],-.31);
+  translateY(skirting,[16,17,18,19,20,21,22,23,26],-.31);
+  changeY(walls,[6],9.73,9.42);
+  changeY(skirting,[24,25],9.73,9.42);
+
+  // Continue the already centred sound-booth partition to the outside corner.
+  translateY(walls,[0,2,26],-1.10);
+  translateY(doors,[0,1],-1.10);
+  translateY(skirting,[8,9,10,11,13,76,77],-1.10);
+
+}
+alignStairWalls();
+
 
 const $=id=>document.getElementById(id), clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
