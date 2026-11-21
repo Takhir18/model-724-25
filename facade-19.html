@@ -234,7 +234,7 @@ ceiling(22,24.1,1.3);
 // Banquet hall and adjoining public lobby.
 for(const [x,y] of [[2.2,3.2],[2.2,8.4],[2.2,13.6],[6.4,3.2],[6.4,8.4],[6.4,13.6]]) meeting(x,y,2.1);
 for(const [x,y] of [[.5,1],[8.45,1],[.5,16.6],[8.45,16.6],[11.8,18.6],[18.8,18.6]])plant(x,y,true);
-// Cafe replaces the two original lobby pictures.
+for(const [x,y] of [[13.2,17.98],[19,17.98]])painting(x,y);
 // A clear corridor receives continuous light and modest wall decoration.
 for(const x of [11.4,14.2,17,20,23,26,29,32,35,38])ceiling(x,10.7,1.1);
 for(const x of [20.4,23,26,29,32,35])painting(x,11.65);
@@ -255,43 +255,6 @@ for(const [x0,y0,x1,y1] of [[0,0,41.6,17.3],[35.72,-2,41.6,0],[11.2,17.3,26.35,2
   officeBox('Пол первого этажа · светлый дуб','#c5a47d',x0,y0,.003,x1,y1,.008,'office_floor');
 for(const [x0,y0,x1,y1] of [[0,0,41.6,17.3],[35.72,-2,41.6,0],[11.2,17.3,26.35,26.4]])
   officeBox('Светлый потолок первого этажа','#f1e8da',x0,y0,3.55,x1,y1,3.58,'office_ceiling');
-
-// Cafe concept 01. Furniture is placed beside the restroom approach.
-(function addCafeConcept(){
- const b=(n,c,x0,y0,z0,x1,y1,z1)=>officeBox('Кафе · '+n,c,x0,y0,z0,x1,y1,z1);
- const dark='#302925', wood='#8a5633', light='#d7c3aa', rust='#a65637', cream='#e6d5bd', metal='#44362f';
- // Service counter and timber backing to the left of the central opening.
- b('стойка',wood,11.40,17.70,.03,14.35,18.16,1.03);
- b('каменная столешница',cream,11.36,17.66,1.03,14.39,18.20,1.10);
- for(let x=11.48;x<14.3;x+=.13)b('вертикальные рейки',light,x,18.162,.08,x+.045,18.18,1.02);
- b('задняя панель',wood,11.4,18.025,1.08,14.35,18.05,2.82);
- for(let x=11.46;x<14.3;x+=.14)b('рейки на стене',light,x,18.05,1.12,x+.035,18.075,2.77);
- for(const z of [1.53,1.94,2.35]) b('полка',dark,11.62,18.075,z,14.1,18.24,z+.045);
- b('кофемашина',metal,12.45,17.75,1.10,13.05,18.02,1.53);
- b('лицевая панель кофемашины','#c6b9a5',12.5,18.02,1.18,13,18.05,1.48);
- for(const x of [11.8,12.1,13.4,13.7]) b('посуда',cream,x,18.1,1.58,x+.11,18.22,1.73);
- // Rust-coloured upholstered bench along the opposite side of the opening.
- b('диван основание',dark,19.05,18.02,.05,21.4,18.52,.35);
- b('диван сиденье',rust,19.05,18.02,.35,21.4,18.56,.49);
- b('диван спинка',rust,19.05,18.00,.47,21.4,18.18,1.13);
- for(const x of [19.5,20,20.5,21])b('шов обивки','#79442f',x,18.18,.55,x+.015,18.195,1.09);
- function table(x,y){
-  b('столешница',wood,x-.36,y-.36,.72,x+.36,y+.36,.77);
-  b('опора стола',metal,x-.035,y-.035,.06,x+.035,y+.035,.72);
-  b('подножие',metal,x-.23,y-.23,.03,x+.23,y+.23,.065);
- }
- function seat(x,y){
-  b('кресло сиденье',rust,x-.24,y-.23,.43,x+.24,y+.23,.51);
-  b('кресло спинка',rust,x-.24,y+.17,.49,x+.24,y+.24,.95);
-  for(const dx of [-.19,.15])for(const dy of [-.17,.13]) b('ножки кресла',metal,x+dx,y+dy,.03,x+dx+.035,y+dy+.035,.43);
- }
- table(12.85,19.15);seat(12.15,19.15);seat(13.5,19.15);
- table(20.2,19.1);seat(20.2,19.77);
- for(const x of [12.0,13.2,14.0]){
-   b('подвес',metal,x-.012,17.92,2.37,x+.012,17.944,3.55);
-   b('тёплый светильник','#f4d19a',x-.10,17.84,2.25,x+.10,18.04,2.38);
- }
-})();
 model.meshes.push(...officeGroups.values());
 // Railings follow the existing stair flights and landings in metres.
 function addStairRailings() {
@@ -2066,12 +2029,11 @@ const officeViews={
   meeting:[34.6,7.2,1.65,-2.12],
   sales:[40.8,16.8,1.65,-2.28],
   banquet:[7.6,14.7,1.65,-2.55],
-  lobby:[15.0,20.2,1.65,.05],
-  cafe:[16.5,21.3,1.65,-Math.PI/2]
+  lobby:[15.0,20.2,1.65,.05]
 };
 const officeMenu=document.createElement('select');
 officeMenu.setAttribute('aria-label','Места первого этажа');
-officeMenu.innerHTML='<option value="">Первый этаж · выбрать место</option><option value="corridor">Коридор</option><option value="support">Отдел сопровождения</option><option value="sales">Продажи и маркетинг</option><option value="meeting">Переговорная</option><option value="banquet">Банкетный зал</option><option value="lobby">Холл</option><option value="cafe">Кафе</option>';
+officeMenu.innerHTML='<option value="">Первый этаж · выбрать место</option><option value="corridor">Коридор</option><option value="support">Отдел сопровождения</option><option value="sales">Продажи и маркетинг</option><option value="meeting">Переговорная</option><option value="banquet">Банкетный зал</option><option value="lobby">Холл</option>';
 officeMenu.style.cssText='max-width:220px;padding:7px;border:1px solid #b9c6bd;border-radius:6px;background:#fbfcf5;color:#263c31;font:inherit;margin-top:6px';
 walkHud.querySelector('.walk-help').append(document.createElement('br'),officeMenu);
 officeMenu.onchange=()=>{
