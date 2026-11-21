@@ -493,6 +493,94 @@ function alignSingleCorridorDoor(){
   doors.faces=doors.faces.filter(face=>!face.every(index=>index>=8&&index<16));
 }
 alignSingleCorridorDoor();
+// Centre the sound-room doorway and move the terrace exit toward the lower wall.
+function reviseSoundDoorAndTerraceExit(){
+  const find=(kind,name)=>{
+    const matches=model.meshes.filter(m=>String(m.level)==='3'&&m.kind===kind&&m.name===name);
+    if(matches.length!==1)throw Error('Не найдена геометрия антресоли: '+name);
+    return matches[0];
+  };
+  const walls=find('wall','Перегородки');
+  const doors=find('door','Двери');
+  const skirting=find('interior_stone','Каменный плинтус');
+  function transform(mesh,blocks,change){
+    for(const block of blocks)for(let i=block*8;i<(block+1)*8;i++){
+      const p=mesh.vertices[i];
+      if(!p)throw Error('Недостаточно вершин: '+mesh.name+' / '+block);
+      change(p);
+    }
+  }
+  const move=amount=>p=>{p[1]+=amount;};
+  function replaceY(mesh,blocks,from,to){
+    transform(mesh,blocks,p=>{if(Math.abs(p[1]-from)<.0001)p[1]=to;});
+  }
+  // The sound-room wall spans Y 6.65–10.65; its doorway centre is Y 8.65.
+  replaceY(walls,[9],7.957,8.10);
+  replaceY(walls,[10],9.057,9.20);
+  transform(walls,[11],move(.143));
+  transform(doors,[3],move(.143));
+  replaceY(skirting,[36,37],7.957,8.10);
+  transform(skirting,[39],move(.143));
+  replaceY(skirting,[40,41],9.057,9.20);
+  transform(skirting,[42],move(.143));
+
+  // Keep the existing 1.30 m terrace door and five steps aligned.
+  const stairs=model.meshes.filter(m=>String(m.level)==='3'&&m.kind==='stairs'&&m.name==='Лестница на террасу'&&
+    m.vertices.some(p=>Math.abs(p[1]-8.08)<.0001));
+  if(stairs.length!==5)throw Error('Не найдены пять ступеней выхода на террасу');
+  for(const stair of stairs)stair.vertices.forEach(move(-1.25));
+  for(const [kind,name,blocks] of [
+    ['frame','Рама · Терраса, ось 6',[3,4,5]],
+    ['door','Полотна двери · Терраса, ось 6',[2,3]],
+    ['frame','Притвор · Терраса, ось 6',[1]],
+    ['frame','Ручка двери · Терраса, ось 6',[2,3]]
+  ])transform(find(kind,name),blocks,move(-1.25));
+  const masonry=find('exterior','Кладка · Терраса, ось 6');
+  const plaster=find('interior_plaster','Минеральная штукатурка');
+  for(const [mesh,near,left,right] of [[masonry,3,4,6],[plaster,10,11,13],[skirting,5,6,7]]){
+    replaceY(mesh,[near],7.9,6.65);
+    transform(mesh,mesh===skirting?[left]:[left,left+1],move(-1.25));
+    replaceY(mesh,[right],9.2,7.95);
+  }
+
+  // Cut the opening through the existing individual facade panels, retaining
+  // their original colours and every unaffected panel.
+  const panelName='Графитовые плиты · Терраса, ось 6';
+  const panels=model.meshes.filter(m=>String(m.level)==='3'&&m.kind==='exterior'&&m.name===panelName);
+  if(panels.length!==5)throw Error('Не найдены панели фасада террасы');
+  const opening={y0:6.65,y1:7.95,z0:7.65,z1:9.75};
+  function addBox(mesh,x0,y0,z0,x1,y1,z1){
+    if(x1-x0<.0001||y1-y0<.0001||z1-z0<.0001)return;
+    const i=mesh.vertices.length;
+    mesh.vertices.push([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],
+      [x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]);
+    for(const f of [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],
+      [1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]])mesh.faces.push(f.map(n=>i+n));
+  }
+  for(const mesh of panels){
+    const originalCount=mesh.vertices.length/8;
+    for(let b=0;b<originalCount;b++){
+      const start=b*8,p=mesh.vertices.slice(start,start+8);
+      const low=[0,1,2].map(k=>Math.min(...p.map(v=>v[k])));
+      const high=[0,1,2].map(k=>Math.max(...p.map(v=>v[k])));
+      const [x0,y0,z0]=low,[x1,y1,z1]=high;
+      const a=Math.max(y0,opening.y0),bnd=Math.min(y1,opening.y1);
+      const c=Math.max(z0,opening.z0),d=Math.min(z1,opening.z1);
+      if(bnd-a<.0001||d-c<.0001)continue;
+      mesh.faces=mesh.faces.filter(face=>!face.every(i=>i>=start&&i<start+8));
+      addBox(mesh,x0,y0,z0,x1,a,z1);
+      addBox(mesh,x0,bnd,z0,x1,y1,z1);
+      addBox(mesh,x0,a,z0,x1,bnd,c);
+      addBox(mesh,x0,a,d,x1,bnd,z1);
+    }
+  }
+  // Close the section vacated by the former door, matching the panel joints.
+  const fill=panels.find(m=>m.color==='#353739')||panels[0];
+  for(const [z0,z1] of [[7.6565,8.1935],[8.2065,9.2935],[9.3065,9.7435]])
+    addBox(fill,29.801,7.9565,z0,29.832,9.1935,z1);
+}
+reviseSoundDoorAndTerraceExit();
+
 
 
 
