@@ -914,6 +914,68 @@ function widenShiftTerraceWindow(){
     addBox(fill,29.801,5.0065,z0,29.832,5.3835,z1);
 }
 widenShiftTerraceWindow();
+// Extend only the mezzanine floor opening above stair L3; keep its walls.
+function extendMezzanineStairOpening(){
+  const eq=(a,b)=>Math.abs(a-b)<1e-5;
+  const matches=model.meshes.filter(m=>String(m.level)==='3'&&m.kind==='slab'&&m.name==='Антресоль'&&
+    m.vertices.length===8&&
+    eq(Math.min(...m.vertices.map(p=>p[0])),28.14)&&eq(Math.max(...m.vertices.map(p=>p[0])),29.4)&&
+    eq(Math.min(...m.vertices.map(p=>p[1])),14.3)&&eq(Math.max(...m.vertices.map(p=>p[1])),17.3)&&
+    eq(Math.min(...m.vertices.map(p=>p[2])),6.6)&&eq(Math.max(...m.vertices.map(p=>p[2])),6.8));
+  if(matches.length!==1)throw Error('Не найден край плиты у лестницы Л3');
+  const slab=matches[0];let changed=0;
+  for(const vertex of slab.vertices)if(eq(vertex[1],14.3)){vertex[1]=15.1;changed++;}
+  if(changed!==4)throw Error('Не найден край проёма лестницы Л3');
+}
+extendMezzanineStairOpening();
+
+// Preliminary visual relocation: keep the stair-end partition supported on the
+// retained part of the modeled mezzanine after the opening has been lengthened.
+function moveStairEndPartition(){
+  const find=(kind,name)=>{
+    const matches=model.meshes.filter(m=>String(m.level)==='3'&&m.kind===kind&&m.name===name);
+    if(matches.length!==1)throw Error('Не найдена перегородка у лестницы: '+name);
+    return matches[0];
+  };
+  const wall=find('wall','Перегородки');
+  const skirting=find('interior_stone','Каменный плинтус');
+  const near=(a,b)=>Math.abs(a-b)<.0001;
+  function bounds(mesh,block){
+    const p=mesh.vertices.slice(block*8,block*8+8);
+    if(p.length!==8)throw Error('Недостаточно вершин: '+mesh.name+' / '+block);
+    return [0,1,2].map(k=>[Math.min(...p.map(v=>v[k])),Math.max(...p.map(v=>v[k]))]);
+  }
+  function expect(mesh,block,axis,a,b){
+    const v=bounds(mesh,block)[axis];
+    if(!near(v[0],a)||!near(v[1],b))throw Error('Не совпадает положение: '+mesh.name+' / '+block);
+  }
+  function shift(mesh,blocks,amount){
+    for(const block of blocks){bounds(mesh,block);for(let i=block*8;i<(block+1)*8;i++)mesh.vertices[i][1]+=amount;}
+  }
+  function stretch(mesh,block,from,to){
+    bounds(mesh,block);let count=0;
+    for(let i=block*8;i<(block+1)*8;i++)if(near(mesh.vertices[i][1],from)){
+      mesh.vertices[i][1]=to;count++;
+    }
+    if(count!==4)throw Error('Не найден край перегородки: '+mesh.name+' / '+block);
+  }
+  expect(wall,6,0,28.02,28.14);expect(wall,6,1,9.42,14.42);
+  expect(wall,7,0,28.14,29.373);expect(wall,7,1,14.30,14.42);
+  for(const b of [24,25])expect(skirting,b,1,9.42,14.42);
+  expect(skirting,27,1,14.42,14.433);
+  expect(skirting,28,1,14.30,14.42);
+  expect(skirting,29,1,14.30,14.42);
+  expect(skirting,30,1,14.287,14.30);
+  expect(skirting,31,1,14.42,14.433);
+  // The cross-wall rests over the new slab edge at Y=15.10, while its left
+  // junction stays attached to the extended longitudinal partition.
+  stretch(wall,6,14.42,15.22);
+  shift(wall,[7],.8);
+  for(const b of [24,25])stretch(skirting,b,14.42,15.22);
+  shift(skirting,[27,28,29,30,31],.8);
+}
+moveStairEndPartition();
+
 
 
 
