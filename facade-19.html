@@ -312,6 +312,20 @@ function addStairRailings() {
   model.meshes.push(...rails.values());
 }
 addStairRailings();
+// Show the existing first-floor restroom and cubicle doors in walk mode.
+// Preserve the original leaf geometry and leave all other doors unchanged.
+{
+  const candidates=model.meshes.filter(m=>String(m.level)==='1'&&m.kind==='door'&&m.name==='Двери');
+  if(candidates.length!==1) throw Error('Не найдены двери первого этажа');
+  const doors=candidates[0], first=80, end=176;
+  if(doors.vertices.length<end) throw Error('Недостаточно геометрии дверей санузлов');
+  const selected=doors.faces.filter(f=>f.every(i=>i>=first&&i<end));
+  if(selected.length!==144) throw Error('Не совпало число граней дверей санузлов: '+selected.length);
+  doors.faces=doors.faces.filter(f=>!f.every(i=>i>=first&&i<end));
+  model.meshes.push({...doors,kind:'restroom_door',name:'Двери санузлов',
+    vertices:doors.vertices.slice(first,end),faces:selected.map(f=>f.map(i=>i-first))});
+}
+
 
 model.notes.unshift('Первый этаж: офисная мебель, светлые стены, пол под дуб, светильники, картины и растения показаны для согласования. Размеры мебели и расположение инженерных коммуникаций уточняются по обмерам.');
 
