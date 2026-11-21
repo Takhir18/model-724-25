@@ -1959,7 +1959,7 @@ function highlightFloor(level){
 }
 document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>floorChanged(b.dataset.level));
 $('plus').onclick=()=>moveZoom(1.25);$('minus').onclick=()=>moveZoom(.8);$('fit').onclick=reset;
-$('above').onclick=()=>{state.pan=[0,0];state.zoom=1;topOn(!state.top)};$('names').onclick=()=>{state.names=!state.names;$('names').setAttribute('aria-pressed',String(state.names));schedule()};
+$('above').onclick=()=>{state.pan=[0,0];state.zoom=1;const on=!state.top;topOn(on);if(state.level==='1')setCutaway(on)};$('names').onclick=()=>{state.names=!state.names;$('names').setAttribute('aria-pressed',String(state.names));schedule()};
 function position(e,el){const r=el.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
 function gestures(el,drag,pinch,wheel){
  const pointers=new Map();let segment;
