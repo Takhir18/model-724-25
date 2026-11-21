@@ -1011,6 +1011,135 @@ function centerSoundDoorInCorridor(){
   door.faces=door.faces.map(face=>face.every(i=>i>=24&&i<32)?[face[0],face[2],face[1]]:face);
 }
 centerSoundDoorInCorridor();
+// Preliminary model geometry: widen the existing mezzanine opening so the
+// wider L3 stair can run flush with the right-hand wall. The structural design
+// of a real floor opening and its supports requires separate verification.
+function widenStairOpeningAndWalls(){
+  const eq=(a,b)=>Math.abs(a-b)<1e-5;
+  const find=(kind,name)=>{
+    const m=model.meshes.filter(o=>String(o.level)==='3'&&o.kind===kind&&o.name===name);
+    if(m.length!==1)throw Error('Не найдена геометрия у лестницы: '+name);
+    return m[0];
+  };
+  const wall=find('wall','Перегородки'),skirt=find('interior_stone','Каменный плинтус');
+  function bounds(mesh,block){
+    const p=mesh.vertices.slice(block*8,block*8+8);
+    if(p.length!==8)throw Error('Не найдены вершины: '+mesh.name+' '+block);
+    return [0,1,2].map(k=>[Math.min(...p.map(v=>v[k])),Math.max(...p.map(v=>v[k]))]);
+  }
+  function check(mesh,block,axis,min,max){const b=bounds(mesh,block)[axis];if(!eq(b[0],min)||!eq(b[1],max))throw Error('Изменено исходное положение: '+mesh.name+' '+block);}
+  function changeX(mesh,block,from,to){
+    bounds(mesh,block);let count=0;
+    for(let i=block*8;i<(block+1)*8;i++)if(eq(mesh.vertices[i][0],from)){mesh.vertices[i][0]=to;count++;}
+    if(count!==4)throw Error('Не найден край: '+mesh.name+' '+block);
+  }
+  function shiftX(mesh,block,delta){bounds(mesh,block);for(let i=block*8;i<(block+1)*8;i++)mesh.vertices[i][0]+=delta;}
+  const oldEdge=28.14,newEdge=27.82,delta=newEdge-oldEdge;
+  check(wall,3,0,27.543,28.14);check(wall,6,0,28.02,28.14);check(wall,7,0,28.14,29.373);
+  check(wall,6,1,9.42,15.22);check(wall,7,1,15.1,15.22);
+  changeX(wall,3,oldEdge,newEdge);
+  shiftX(wall,6,delta);
+  changeX(wall,7,oldEdge,newEdge);
+  for(const block of [17,24,25,26,27,28])shiftX(skirt,block,delta);
+  for(const block of [18,19,30,31])changeX(skirt,block,oldEdge,newEdge);
+  // Cut only the strip along the stair. The rest of the mezzanine floor
+  // retains its original dimensions on both sides of the opening.
+  const slabs=model.meshes.filter(o=>String(o.level)==='3'&&o.kind==='slab'&&o.name==='Антресоль'&&o.vertices.length===8&&
+    eq(Math.min(...o.vertices.map(p=>p[0])),23.35)&&eq(Math.max(...o.vertices.map(p=>p[0])),oldEdge)&&
+    eq(Math.min(...o.vertices.map(p=>p[1])),0)&&eq(Math.max(...o.vertices.map(p=>p[1])),17.3)&&
+    eq(Math.min(...o.vertices.map(p=>p[2])),6.6)&&eq(Math.max(...o.vertices.map(p=>p[2])),6.8));
+  if(slabs.length!==1)throw Error('Не найдена плита антресоли вдоль лестницы');
+  const slab=slabs[0];
+  function slabBox(y0,y1){
+    const z0=6.6,z1=6.8,x0=newEdge,x1=oldEdge;
+    const vertices=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],
+      [x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
+    return {...slab,vertices,faces:slab.faces.map(f=>f.slice())};
+  }
+  const before=slabBox(0,9.3),after=slabBox(15.1,17.3);
+  let changed=0;for(const p of slab.vertices)if(eq(p[0],oldEdge)){p[0]=newEdge;changed++;}
+  if(changed!==4)throw Error('Не найден край плиты');
+  model.meshes.push(before,after);
+}
+widenStairOpeningAndWalls();
+
+// Widen the two L3 flights and landing to 1.58 m against the outer wall.
+// This is a geometric proposal; actual stair/fire and structural design is separate.
+function widenMezzanineStairFlights(){
+  const near=(a,b)=>Math.abs(a-b)<1e-5;
+  const treadBounds=[];
+  for(const name of ['Лестница Л3 · первый марш','Лестница Л3 · промежуточная площадка','Лестница Л3 · второй марш']){
+    const found=model.meshes.filter(m=>String(m.level)==='2'&&m.kind==='stairs'&&m.name===name);
+    if(found.length!==1)throw Error('Не найдена лестница: '+name);
+    const mesh=found[0];let left=0,right=0;
+    for(const p of mesh.vertices){
+      if(near(p[0],28.25)){p[0]=27.82;left++;}
+      else if(near(p[0],29.35)){p[0]=29.4;right++;}
+      else throw Error('Неожиданная ширина ступени: '+name);
+    }
+    if(!left||left!==right)throw Error('Повреждена геометрия лестницы: '+name);
+    for(let i=0;i<mesh.vertices.length;i+=8){
+      const p=mesh.vertices.slice(i,i+8);
+      if(p.length!==8)throw Error('Неполная ступень: '+name);
+      treadBounds.push({y0:Math.min(...p.map(v=>v[1])),y1:Math.max(...p.map(v=>v[1])),z:Math.max(...p.map(v=>v[2]))});
+    }
+  }
+  const old=model.meshes.filter(m=>String(m.level)==='2'&&m.kind==='stair_railing'&&m.name==='Перила лестницы');
+  if(old.length!==1)throw Error('Не найдены перила лестницы на антресоль');
+  model.meshes=model.meshes.filter(m=>m!==old[0]);
+  const rail={level:2,visibleOnFloor:['2','3'],kind:'stair_railing',name:'Перила лестницы',color:'#373d3e',vertices:[],faces:[]};
+  function tube(a,b,r){
+    const d=b.map((x,i)=>x-a[i]),len=Math.hypot(...d);
+    if(len<1e-6)throw Error('Нулевой элемент перил лестницы');
+    const axis=d.map(x=>x/len),helper=Math.abs(axis[2])>.9?[1,0,0]:[0,0,1];
+    const cross=(u,v)=>[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+    const w=cross(axis,helper),wl=Math.hypot(...w),u=w.map(x=>x/wl),v=cross(axis,u),start=rail.vertices.length,n=10;
+    for(const p of [a,b])for(let i=0;i<n;i++){
+      const t=2*Math.PI*i/n;rail.vertices.push(p.map((x,k)=>x+r*(u[k]*Math.cos(t)+v[k]*Math.sin(t))));
+    }
+    for(let i=0;i<n;i++){
+      const j=(i+1)%n;
+      rail.faces.push([start+i,start+j,start+n+j],[start+i,start+n+j,start+n+i]);
+      if(i>0&&i<n-1)rail.faces.push([start,start+i+1,start+i],[start+n,start+n+i,start+n+i+1]);
+    }
+  }
+  // Reference lines go through actual tread nosings, not the underside of the
+  // flight. The wall-side guard stays 50 mm away from the wall.
+  function surface(y){
+    const z=treadBounds.filter(t=>y>=t.y0-1e-5&&y<=t.y1+1e-5).map(t=>t.z);
+    if(!z.length)throw Error('Нет ступени под перилами: '+y);
+    return Math.max(...z);
+  }
+  function flight(x,y0,z0,y1,z1,posts){
+    const height=1.205,handHeight=.905;
+    tube([x,y0,z0+height],[x,y1,z1+height],.025);
+    tube([x,y0,z0+handHeight],[x,y1,z1+handHeight],.025);
+    for(let i=0;i<=posts;i++){
+      const t=i/posts,y=y0+(y1-y0)*t,z=z0+(z1-z0)*t;
+      tube([x,y,surface(y)-.03],[x,y,z+height],.018);
+    }
+    // Vertical infill keeps openings narrow while staying inside the railing
+    // profile, so the clear width between the two sides is unchanged.
+    const divisions=Math.ceil(Math.abs(y1-y0)/.10);
+    for(let i=1;i<divisions;i++){
+      const t=i/divisions;
+      if(Array.from({length:posts+1},(_,j)=>Math.abs(t-j/posts)).some(v=>v<1e-6))continue;
+      const y=y0+(y1-y0)*t,z=z0+(z1-z0)*t;
+      tube([x,y,surface(y)-.03],[x,y,z+height],.01);
+    }
+  }
+  for(const x of [27.895,29.325]){
+    // At each change of slope the upper rail and lower handrail meet exactly.
+    flight(x,16.00,3.967,13.00,5.633,5);
+    flight(x,13.00,5.633,11.70,5.633,2);
+    flight(x,11.70,5.633,11.40,5.800,1);
+    flight(x,11.40,5.800,9.60,6.800,3);
+    flight(x,9.60,6.800,9.31,6.800,1);
+  }
+  model.meshes.push(rail);
+}
+widenMezzanineStairFlights();
+
 
 
 
