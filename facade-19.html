@@ -1400,8 +1400,9 @@ for(const mesh of data){
   mesh.kind==='frame'&&/^(Притвор|Ручка двери) · Терраса, ось 6$/.test(mesh.name)
  );
  const columnDepthOffset=(lev==='2'||lev==='3')&&mesh.kind==='column';
- const key=[lev,visibleOnFloor.join(','),alpha<.99,brick,roof,wood,emission,walkHidden,finish.join(','),columnDepthOffset,stageWash,roofTruss,mesh.trussHeight].join('-');
- const group=grouped.get(key)||{level:lev,visibleOnFloor,transparent:alpha<.99,brick,roof,wood,emission,walkHidden,finish,columnDepthOffset,stageWash,roofTruss,trussHeight:mesh.trussHeight,packed:[]};grouped.set(key,group);
+ const planCeiling=lev==='1'&&mesh.kind==='office_ceiling';
+ const key=[lev,visibleOnFloor.join(','),alpha<.99,brick,roof,wood,emission,walkHidden,finish.join(','),columnDepthOffset,stageWash,roofTruss,mesh.trussHeight,planCeiling].join('-');
+ const group=grouped.get(key)||{level:lev,visibleOnFloor,transparent:alpha<.99,brick,roof,wood,emission,walkHidden,finish,columnDepthOffset,stageWash,roofTruss,trussHeight:mesh.trussHeight,planCeiling,packed:[]};grouped.set(key,group);
  let polygons=mesh.faces||[];if(polygons.length && !Array.isArray(polygons[0]))polygons=Array.from({length:polygons.length/3},(_,i)=>polygons.slice(i*3,i*3+3));
  const c=rgb(mesh.color),packed=group.packed;
  for(const poly of polygons){for(let j=1;j<poly.length-1;j++){
@@ -1421,7 +1422,7 @@ for(const [i,j] of [[-1,-1],[1,-1],[1,1],[-1,-1],[1,1],[-1,1]])ground.packed.pus
 ground.packed=new Float32Array(ground.packed);
 const scene=[ground,...groups],cutCache=new Map(),nominalFloor={1:0,2:3.8,3:6.8};
 const fullFloors=new Map(Object.keys(levels).map(level=>[level,groups.filter(g=>!g.roof&&g.visibleOnFloor.includes(level))]));
-const planFloors=new Map([...fullFloors].map(([level,items])=>[level,items.filter(g=>!g.roofTruss&&!g.trussHeight)]));
+const planFloors=new Map([...fullFloors].map(([level,items])=>[level,items.filter(g=>!g.roofTruss&&!g.trussHeight&&!g.planCeiling)]));
 const boundsCache=new WeakMap([[groups,total]]);
 function boundsFor(visible){
  if(boundsCache.has(visible))return boundsCache.get(visible);
@@ -1495,7 +1496,7 @@ for(const button of trussChoices)button.addEventListener('click',()=>{
 });
 function activeGroups(){
  if(state.level==='all')return visibleTrusses(groups);
- return visibleTrusses(state.cutaway?cutGroups(state.level):(state.top?planFloors:fullFloors).get(state.level));
+ return visibleTrusses(state.cutaway?cutGroups(state.level):((state.top||state.level==='1')?planFloors:fullFloors).get(state.level));
 }
 function updateSize(){const r=stage.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,gl?2:1.5);const walkDpr=(!gl&&walkState.active)?Math.min(dpr,720/Math.max(1,r.width)):dpr;const w=Math.max(1,Math.round(r.width*walkDpr)),h=Math.max(1,Math.round(r.height*walkDpr));if(w!==canvas.width||h!==canvas.height){canvas.width=w;canvas.height=h}return {w:r.width,h:r.height}}
 function basis(dir,top=false){const right=top?[1,0,0]:unit(cross([0,0,1],dir)),up=unit(cross(dir,right));return {right,up,dir}}
