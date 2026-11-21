@@ -639,6 +639,58 @@ function sizeTerraceExit900(){
     addPanel(7.5565,z0,7.9435,z1);
 }
 sizeTerraceExit900();
+// Replace the terrace's two narrow leaves with one 2000 mm leaf opening outward.
+function makeSingleTerraceDoor(){
+  const find=(kind,name)=>{
+    const matches=model.meshes.filter(m=>String(m.level)==='3'&&m.kind===kind&&m.name===name);
+    if(matches.length!==1)throw Error('Не найдена геометрия антресоли: '+name);
+    return matches[0];
+  };
+  function changeZ(mesh,blocks,from,to){
+    for(const block of blocks)for(let i=block*8;i<(block+1)*8;i++){
+      const point=mesh.vertices[i];
+      if(!point)throw Error('Недостаточно вершин: '+mesh.name+' / '+block);
+      if(Math.abs(point[2]-from)<.0001)point[2]=to;
+    }
+  }
+  function removeBlocks(mesh,blocks){
+    mesh.faces=mesh.faces.filter(face=>!blocks.some(b=>face.every(i=>i>=b*8&&i<(b+1)*8)));
+  }
+  const masonry=find('exterior','Кладка · Терраса, ось 6');
+  const plaster=find('interior_plaster','Минеральная штукатурка');
+  const frame=find('frame','Рама · Терраса, ось 6');
+  const oldLeaves=find('door','Полотна двери · Терраса, ось 6');
+  const oldCentre=find('frame','Притвор · Терраса, ось 6');
+  const oldHandles=find('frame','Ручка двери · Терраса, ось 6');
+  // Opening height 2060 mm, with the head above the 2000 mm leaf.
+  changeZ(masonry,[5],9.75,9.71);
+  changeZ(plaster,[12],9.75,9.71);
+  changeZ(frame,[3,4],9.75,9.71);
+  changeZ(frame,[5],9.698,9.658);
+  changeZ(frame,[5],9.75,9.71);
+  removeBlocks(oldLeaves,[2,3]);
+  removeBlocks(oldCentre,[1]);
+  removeBlocks(oldHandles,[2,3]);
+
+  function makeBox(kind,name,color,x0,y0,z0,x1,y1,z1){
+    const vertices=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],
+      [x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
+    const faces=[[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],
+      [1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];
+    return {level:3,kind,name,color,vertices,faces};
+  }
+  // The hinge is at the lower-wall jamb. The visible leaf opens 90° outwards.
+  // Its width fits within the existing jambs and its height is exactly 2 m.
+  model.meshes.push(makeBox('terrace_exit_leaf','Дверь на террасу · открытая створка',
+    '#454947',29.647,6.702,7.658,30.443,6.742,9.658));
+  model.meshes.push(makeBox('terrace_exit_hardware','Ручка двери на террасу',
+    '#b6b7ae',30.285,6.668,8.60,30.355,6.702,8.64));
+  // Cover the 40 mm facade strip above the resized opening.
+  model.meshes.push(makeBox('exterior','Облицовка над дверью террасы',
+    '#353739',29.801,6.65,9.71,29.832,7.55,9.75));
+}
+makeSingleTerraceDoor();
+
 
 
 
