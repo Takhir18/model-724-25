@@ -1328,6 +1328,48 @@ lengthenMezzanineStairFlights();
 
 
 
+
+// Adjacent four-storey building 23/1, schematic dimensions estimated from the map.
+// It is context for the exterior overview, not part of any interior floor.
+(function addNeighbourBuilding(){
+ const byColor=new Map();
+ function box(name,color,x0,y0,z0,x1,y1,z1){
+  const key=name+':'+color;let m=byColor.get(key);
+  if(!m){m={level:'context',kind:'neighbour_building',name,color,vertices:[],faces:[]};byColor.set(key,m);}
+  const k=m.vertices.length;
+  m.vertices.push([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]);
+  for(const f of [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]])m.faces.push(f.map(i=>i+k));
+ }
+ const xmin=-14.0,xmax=15.5,ymin=-11.9,ymax=-.37,h=12.8;
+ box('Соседнее здание 23/1 · кирпич','#805247',xmin,ymin,0,xmax,ymax,h);
+ box('Соседнее здание 23/1 · цоколь','#57534f',xmin-.015,ymin-.015,0,xmax+.015,ymax+.015,.43);
+ box('Соседнее здание 23/1 · кровля','#504b47',xmin-.10,ymin-.10,12.65,xmax+.10,ymax+.06,12.84);
+ // Thin horizontal mortar courses on the visible long and end facades.
+ for(let z=.58;z<12.6;z+=.26){
+   box('Соседнее здание 23/1 · швы','#987064',xmin,ymin-.018,z,xmax,ymin-.006,z+.014);
+   box('Соседнее здание 23/1 · швы торца','#987064',xmin-.018,ymin,z,xmin-.006,ymax,z+.014);
+ }
+ // White-framed glazing follows the four rows in the reference photograph.
+ for(let f=0;f<4;f++){
+  const bottom=.82+3.08*f,top=bottom+1.55;
+  for(let i=0;i<10;i++){
+   const cx=-12.7+i*2.94;
+   box('Соседнее здание 23/1 · белые оконные рамы','#e5e4df',cx-.69,ymin-.045,bottom,cx+.69,ymin-.02,top);
+   box('Соседнее здание 23/1 · остекление','#526771',cx-.63,ymin-.052,bottom+.07,cx+.63,ymin-.046,top-.07);
+   box('Соседнее здание 23/1 · переплёт','#deded8',cx-.025,ymin-.060,bottom+.05,cx+.025,ymin-.053,top-.05);
+  }
+  for(let i=0;i<3;i++){
+   const cy=-10.15+i*3.65;
+   box('Соседнее здание 23/1 · торцевые рамы','#e5e4df',xmin-.045,cy-.62,bottom,xmin-.02,cy+.62,top);
+   box('Соседнее здание 23/1 · торцевые окна','#526771',xmin-.052,cy-.56,bottom+.07,xmin-.046,cy+.56,top-.07);
+  }
+ }
+ // A simple entrance on the outer long facade.
+ box('Соседнее здание 23/1 · вход','#d8d6ce',-9.1,ymin-.08,.04,-7.5,ymin-.04,2.35);
+ box('Соседнее здание 23/1 · дверное стекло','#4d5c60',-9.0,ymin-.09,.12,-7.6,ymin-.08,2.25);
+ box('Соседнее здание 23/1 · козырёк','#484440',-9.3,ymin-.75,2.35,-7.3,ymin-.02,2.48);
+ model.meshes.push(...byColor.values());
+})();
 const $=id=>document.getElementById(id), clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 const sub=(a,b)=>a.map((x,i)=>x-b[i]), dot=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0);
