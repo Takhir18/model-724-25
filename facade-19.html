@@ -460,6 +460,40 @@ function alignSoundWalls(){
   for(const block of [0,1])for(let i=block*8;i<(block+1)*8;i++)doors.vertices[i][1]-=.05;
 }
 alignSoundWalls();
+// Replace the double corridor door with a leaf aligned with the opposite door.
+function alignSingleCorridorDoor(){
+  const find=(kind,name)=>{
+    const matches=model.meshes.filter(m=>String(m.level)==='3'&&m.kind===kind&&m.name===name);
+    if(matches.length!==1)throw Error('Не найдена геометрия антресоли: '+name);
+    return matches[0];
+  };
+  const walls=find('wall','Перегородки');
+  const doors=find('door','Двери');
+  const skirting=find('interior_stone','Каменный плинтус');
+  function setX(mesh,blocks,replacements){
+    for(const block of blocks)for(let i=block*8;i<(block+1)*8;i++){
+      const vertex=mesh.vertices[i];
+      if(!vertex)throw Error('Недостаточно вершин: '+mesh.name+' / '+block);
+      for(const [before,after] of replacements)
+        if(Math.abs(vertex[0]-before)<.0001){vertex[0]=after;break;}
+    }
+  }
+  // The opposite door opening spans X 26.443–27.543 m.
+  setX(walls,[26],[[27.8,26.443]]);
+  setX(walls,[2],[[27.8,26.443],[29.1,27.543]]);
+  setX(walls,[0],[[29.1,27.543]]);
+  setX(skirting,[13],[[27.8,26.443],[27.813,26.456]]);
+  setX(skirting,[76,77],[[27.8,26.443]]);
+  setX(skirting,[8],[[29.087,27.53],[29.1,27.543]]);
+  setX(skirting,[10,11],[[29.1,27.543]]);
+  // Copy the opposite single leaf and reflect it into the corridor.
+  const opposite=doors.vertices.slice(16,24).map(([x,y,z])=>[x,15.96-y,z]);
+  for(let i=0;i<8;i++)doors.vertices[i]=opposite[i];
+  // Remove the second leaf's triangles without renumbering the other doors.
+  doors.faces=doors.faces.filter(face=>!face.every(index=>index>=8&&index<16));
+}
+alignSingleCorridorDoor();
+
 
 
 
