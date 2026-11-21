@@ -423,6 +423,44 @@ function alignStairWalls() {
 
 }
 alignStairWalls();
+// Align the two sound-room walls with the outside and inside faces of the bay.
+function alignSoundWalls(){
+  const find=(kind,name)=>{
+    const matches=model.meshes.filter(m=>String(m.level)==='3'&&m.kind===kind&&m.name===name);
+    if(matches.length!==1)throw Error('Не найдена геометрия антресоли: '+name);
+    return matches[0];
+  };
+  const walls=find('wall','Перегородки');
+  const skirting=find('interior_stone','Каменный плинтус');
+  const doors=find('door','Двери');
+  function setY(mesh,blocks,replacements){
+    for(const block of blocks)for(let i=block*8;i<(block+1)*8;i++){
+      const vertex=mesh.vertices[i];
+      if(!vertex)throw Error('Недостаточно вершин: '+mesh.name+' / '+block);
+      for(const [before,after] of replacements)
+        if(Math.abs(vertex[1]-before)<.0001){vertex[1]=after;break;}
+    }
+  }
+  // The bay ends at Y=6.55–6.65 and Y=10.65–10.75.
+  setY(walls,[0,1,2,26],[[6.59,6.55],[6.71,6.65]]);
+  setY(walls,[8],[[10.58,10.65],[10.70,10.75]]);
+  setY(walls,[9],[[6.71,6.65]]);
+  setY(walls,[10],[[10.58,10.65]]);
+  setY(skirting,[8,9,12,13],[[6.59,6.55],[6.71,6.65]]);
+  setY(skirting,[10,14,76],[[6.577,6.537],[6.59,6.55]]);
+  setY(skirting,[11,15,77],[[6.71,6.65],[6.723,6.663]]);
+  setY(skirting,[32,33],[[10.58,10.65],[10.70,10.75]]);
+  setY(skirting,[34],[[10.567,10.637],[10.58,10.65]]);
+  setY(skirting,[35],[[10.70,10.75],[10.713,10.763]]);
+  setY(skirting,[36,37],[[6.71,6.65]]);
+  setY(skirting,[38],[[6.697,6.637],[6.71,6.65]]);
+  setY(skirting,[40,41],[[10.58,10.65]]);
+  setY(skirting,[43],[[10.58,10.65],[10.593,10.663]]);
+  // Keep the two corridor door leaves aligned with their moved partition.
+  for(const block of [0,1])for(let i=block*8;i<(block+1)*8;i++)doors.vertices[i][1]-=.05;
+}
+alignSoundWalls();
+
 
 
 const $=id=>document.getElementById(id), clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
