@@ -1580,11 +1580,15 @@ for(const button of trussChoices)button.addEventListener('click',()=>{
  schedule();
 });
 const neighbourContext=groups.filter(g=>g.level==='context');
+const floorsWithNeighbour=new WeakMap();
 function activeGroups(){
  if(state.level==='all')return visibleTrusses(groups);
- const selected=state.cutaway?cutGroups(state.level):((state.top||state.level==='1')?planFloors:fullFloors).get(state.level);
- // Keep the neighbouring building intact in first- and second-floor overviews.
- return visibleTrusses(state.level==='1'||state.level==='2'?[...selected,...neighbourContext]:selected);
+ let selected=state.cutaway?cutGroups(state.level):((state.top||state.level==='1')?planFloors:fullFloors).get(state.level);
+ if(state.level==='1'||state.level==='2'){
+  if(!floorsWithNeighbour.has(selected))floorsWithNeighbour.set(selected,[...selected,...neighbourContext]);
+  selected=floorsWithNeighbour.get(selected);
+ }
+ return visibleTrusses(selected);
 }
 function updateSize(){const r=stage.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,gl?2:1.5);const walkDpr=(!gl&&walkState.active)?Math.min(dpr,720/Math.max(1,r.width)):dpr;const w=Math.max(1,Math.round(r.width*walkDpr)),h=Math.max(1,Math.round(r.height*walkDpr));if(w!==canvas.width||h!==canvas.height){canvas.width=w;canvas.height=h}return {w:r.width,h:r.height}}
 function basis(dir,top=false){const right=top?[1,0,0]:unit(cross([0,0,1],dir)),up=unit(cross(dir,right));return {right,up,dir}}
