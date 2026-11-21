@@ -1139,6 +1139,81 @@ function widenMezzanineStairFlights(){
   model.meshes.push(rail);
 }
 widenMezzanineStairFlights();
+// Extend the L3 stair opening toward the mezzanine corridor for a 334 mm tread.
+// This changes the visual model only; the structural solution requires design.
+function extendUpperStairOpeningForShallowerPitch(){
+  const near=(a,b)=>Math.abs(a-b)<1e-5;
+  const candidates=model.meshes.filter(m=>String(m.level)==='3'&&m.kind==='slab'&&m.name==='Антресоль'&&m.vertices.length===8);
+  const pieces=[
+    {x0:27.82,x1:28.14},
+    {x0:28.14,x1:29.40}
+  ];
+  for(const piece of pieces){
+    const found=candidates.filter(m=>near(Math.min(...m.vertices.map(v=>v[0])),piece.x0)&&
+      near(Math.max(...m.vertices.map(v=>v[0])),piece.x1)&&
+      near(Math.min(...m.vertices.map(v=>v[1])),0)&&near(Math.max(...m.vertices.map(v=>v[1])),9.3)&&
+      near(Math.min(...m.vertices.map(v=>v[2])),6.6)&&near(Math.max(...m.vertices.map(v=>v[2])),6.8));
+    if(found.length!==1)throw Error('Не найдена верхняя кромка плиты над лестницей: '+piece.x0);
+    let changed=0;
+    for(const p of found[0].vertices)if(near(p[1],9.3)){p[1]=8.988;changed++;}
+    if(changed!==4)throw Error('Не найдена кромка проёма: '+piece.x0);
+  }
+}
+extendUpperStairOpeningForShallowerPitch();
+
+// Concept model: 334 mm treads at the same floor elevations; a 1 m intermediate landing.
+function lengthenMezzanineStairFlights(){
+  const eq=(a,b)=>Math.abs(a-b)<1e-5;
+  const parts=[['Лестница Л3 · первый марш',11,16.0],['Лестница Л3 · второй марш',7,11.326]];
+  const surfaces=[];
+  for(const [name,count,newStart] of parts){
+    const found=model.meshes.filter(m=>String(m.level)==='2'&&m.kind==='stairs'&&m.name===name);
+    if(found.length!==1)throw Error('Не найдена лестница: '+name);
+    const m=found[0];if(m.vertices.length!==8*count)throw Error('Не совпало число ступеней: '+name);
+    for(let block=0;block<count;block++){
+      const p=m.vertices.slice(8*block,8*block+8),oldStart=name.includes('первый')?16.0:11.4;
+      const oldHi=oldStart-.3*block,oldLo=oldStart-.3*(block+1);
+      const hi=newStart-.334*block,lo=newStart-.334*(block+1);
+      for(const q of p){if(eq(q[1],oldHi))q[1]=hi;else if(eq(q[1],oldLo))q[1]=lo;else throw Error('Не совпала проступь: '+name+' / '+block);}
+      surfaces.push({y0:lo,y1:hi,z:Math.max(...p.map(q=>q[2]))});
+    }
+  }
+  const landings=model.meshes.filter(m=>String(m.level)==='2'&&m.kind==='stairs'&&m.name==='Лестница Л3 · промежуточная площадка');
+  if(landings.length!==1||landings[0].vertices.length!==8)throw Error('Не найдена промежуточная площадка');
+  const landing=landings[0];for(const p of landing.vertices){if(eq(p[1],11.4))p[1]=11.326;else if(eq(p[1],12.7))p[1]=12.326;else throw Error('Неверное положение площадки');}
+  surfaces.push({y0:11.326,y1:12.326,z:5.633});
+  const previous=model.meshes.filter(m=>String(m.level)==='2'&&m.kind==='stair_railing'&&m.name==='Перила лестницы');
+  if(previous.length!==1)throw Error('Не найдены перила лестницы');
+  model.meshes=model.meshes.filter(m=>m!==previous[0]);
+  const rail={level:2,visibleOnFloor:['2','3'],kind:'stair_railing',name:'Перила лестницы',color:'#373d3e',vertices:[],faces:[]};
+  function tube(a,b,r){
+    const d=b.map((x,i)=>x-a[i]),len=Math.hypot(...d);if(len<1e-6)throw Error('Нулевой элемент перил');
+    const axis=d.map(x=>x/len),helper=Math.abs(axis[2])>.9?[1,0,0]:[0,0,1];
+    const cross=(u,v)=>[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+    const w=cross(axis,helper),wl=Math.hypot(...w),u=w.map(x=>x/wl),v=cross(axis,u),start=rail.vertices.length,n=10;
+    for(const p of [a,b])for(let i=0;i<n;i++){const t=2*Math.PI*i/n;rail.vertices.push(p.map((x,k)=>x+r*(u[k]*Math.cos(t)+v[k]*Math.sin(t))));}
+    for(let i=0;i<n;i++){const j=(i+1)%n;rail.faces.push([start+i,start+j,start+n+j],[start+i,start+n+j,start+n+i]);if(i>0&&i<n-1)rail.faces.push([start,start+i+1,start+i],[start+n,start+n+i,start+n+i+1]);}
+  }
+  function surface(y){const z=surfaces.filter(s=>y>=s.y0-1e-5&&y<=s.y1+1e-5).map(s=>s.z);if(!z.length)throw Error('Нет ступени под перилами: '+y);return Math.max(...z);}
+  function flight(x,y0,z0,y1,z1,posts){
+    const guard=1.205,hand=.905;
+    tube([x,y0,z0+guard],[x,y1,z1+guard],.025);tube([x,y0,z0+hand],[x,y1,z1+hand],.025);
+    for(let i=0;i<=posts;i++){const t=i/posts,y=y0+(y1-y0)*t,z=z0+(z1-z0)*t;tube([x,y,surface(y)-.03],[x,y,z+guard],.018);}
+    const divisions=Math.ceil(Math.abs(y1-y0)/.10);
+    for(let i=1;i<divisions;i++){const t=i/divisions;if(Array.from({length:posts+1},(_,j)=>Math.abs(t-j/posts)).some(v=>v<1e-6))continue;const y=y0+(y1-y0)*t,z=z0+(z1-z0)*t;tube([x,y,surface(y)-.03],[x,y,z+guard],.01);}
+  }
+  // Mapped nosing positions preserve the existing guard/handrail elevations.
+  for(const x of [27.895,29.325]){
+    flight(x,16.0,3.967,12.66,5.633,5);
+    flight(x,12.66,5.633,11.556769230769,5.633,2);
+    flight(x,11.556769230769,5.633,11.326,5.800,1);
+    flight(x,11.326,5.800,9.322,6.800,3);
+    flight(x,9.322,6.800,8.988,6.800,1);
+  }
+  model.meshes.push(rail);
+}
+lengthenMezzanineStairFlights();
+
 
 
 
