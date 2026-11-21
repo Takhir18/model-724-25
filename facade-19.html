@@ -296,6 +296,24 @@ for(const [x0,y0,x1,y1] of [[0,0,41.6,17.3],[35.72,-2,41.6,0],[11.2,17.3,26.35,2
   b('подвес рассеиватель','#f6dca9',x-.11,y-.11,2.45,x+.11,y+.11,2.48);
  }
 })();
+
+(function addAlphaRestroomEntries(){
+ const found=model.meshes.filter(m=>String(m.level)==='1'&&m.kind==='wall'&&m.name==='Перегородки');
+ if(found.length!==1)throw Error('Не найдены стены санузлов первого этажа');
+ const walls=found[0], close=(a,b)=>Math.abs(a-b)<.001;
+ for(const [start,x0,x1,oldMin] of [[272,15.77,15.89,13.22],[296,17.57,17.69,13.12]]){
+  const points=walls.vertices.slice(start,start+8);
+  if(points.length!==8||!points.every(p=>close(p[0],x0)||close(p[0],x1))||
+     !points.every(p=>close(p[1],oldMin)||close(p[1],17.3)))
+    throw Error('Геометрия стен санузла изменилась: '+start);
+  for(const p of points)if(close(p[1],17.3))p[1]=15.35;
+  officeBox('Санузел Альфа · стена у входа',walls.color,x0,16.25,0,x1,17.3,3.58,'wall');
+  officeBox('Санузел Альфа · перемычка',walls.color,x0,15.35,2.10,x1,16.25,3.58,'wall');
+ }
+ // Both leaves stand open inside their own rooms, leaving the corridor clear.
+ officeBox('Санузел Альфа · левая дверь','#a77e5f',14.88,15.35,.03,15.77,15.39,2.08,'restroom_door');
+ officeBox('Санузел Альфа · правая дверь','#a77e5f',17.69,15.35,.03,18.58,15.39,2.08,'restroom_door');
+})();
 model.meshes.push(...officeGroups.values());
 // Railings follow the existing stair flights and landings in metres.
 function addStairRailings() {
