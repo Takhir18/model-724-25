@@ -792,6 +792,65 @@ function addTerraceStairRailings(){
   model.meshes.push(mesh);
 }
 addTerraceStairRailings();
+// Replace the original wider terrace door and its steps with a fixed window.
+// The newly relocated 900 mm exit remains unchanged.
+function replaceTerraceDoorWithWindow(){
+  const near=(a,b)=>Math.abs(a-b)<.0001;
+  const targets=model.meshes.filter(m=>String(m.level)==='3' && m.kind==='stairs' &&
+    m.name==='Лестница на террасу' && m.vertices.length===8 &&
+    near(Math.min(...m.vertices.map(p=>p[1])),4.27) &&
+    near(Math.max(...m.vertices.map(p=>p[1])),5.09));
+  if(targets.length!==5)throw Error('Не найдены пять ступеней заменяемой двери');
+  const find=(kind,name)=>{
+    const matching=model.meshes.filter(m=>String(m.level)==='3'&&m.kind===kind&&m.name===name);
+    if(matching.length!==1)throw Error('Не найдены элементы двери: '+name);
+    return matching[0];
+  };
+  const leaves=find('door','Полотна двери · Терраса, ось 6');
+  const centre=find('frame','Притвор · Терраса, ось 6');
+  const handles=find('frame','Ручка двери · Терраса, ось 6');
+  const rail=find('terrace_stair_railing','Перила лестниц на террасу');
+  function removeBlocks(mesh,blocks){
+    for(const block of blocks){
+      const lo=block*8,hi=lo+8,before=mesh.faces.length;
+      if(!mesh.vertices[hi-1])throw Error('Не найдена часть двери '+mesh.name+' / '+block);
+      mesh.faces=mesh.faces.filter(f=>!f.every(i=>i>=lo&&i<hi));
+      if(before-mesh.faces.length!==12)throw Error('Неверная геометрия двери '+mesh.name+' / '+block);
+    }
+  }
+  // Three rails of five ten-sided tubes each. The first two belong to the
+  // old exit, the last belongs to the new 900 mm staircase and stays.
+  const firstKept=200;
+  if(rail.vertices.length!==300 ||
+      !rail.vertices.slice(0,firstKept).every(p=>p[1]>4.20&&p[1]<5.16) ||
+      !rail.vertices.slice(firstKept).every(p=>p[1]>7.54&&p[1]<7.61))
+    throw Error('Не найдены отдельные перила лестниц');
+  if(rail.faces.some(f=>f.some(i=>i<firstKept)&&f.some(i=>i>=firstKept)))
+    throw Error('Перила лестниц связаны общей гранью');
+  removeBlocks(leaves,[0,1]);
+  removeBlocks(centre,[0]);
+  removeBlocks(handles,[0,1]);
+  rail.faces=rail.faces.filter(f=>f.every(i=>i>=firstKept)).map(f=>f.map(i=>i-firstKept));
+  rail.vertices=rail.vertices.slice(firstKept);
+  const removed=new Set(targets);
+  model.meshes=model.meshes.filter(m=>!removed.has(m));
+  function box(kind,name,color,x0,y0,z0,x1,y1,z1,opacity){
+    const vertices=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],
+      [x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
+    const faces=[[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],
+      [1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];
+    const mesh={level:3,kind,name,color,vertices,faces};
+    if(opacity!==undefined)mesh.opacity=opacity;
+    model.meshes.push(mesh);
+  }
+  // Existing jambs and head are kept. The old wall and stone skirting beneath
+  // the opening already form the window's solid base.
+  box('frame','Нижняя рама окна на террасу','#272b2d',29.547,4.09,7.65,29.647,5.39,7.702);
+  box('glass','Окно на террасу · остекление','#8299a1',29.585,4.142,7.702,29.609,5.338,9.698,.60);
+  box('interior_stone','Подоконник окна на террасу','#c6bdae',29.28,4.09,7.625,29.547,5.39,7.65);
+}
+replaceTerraceDoorWithWindow();
+
 
 
 
