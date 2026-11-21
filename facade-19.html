@@ -975,6 +975,43 @@ function moveStairEndPartition(){
   shift(skirting,[27,28,29,30,31],.8);
 }
 moveStairEndPartition();
+// Centre the sound-room doorway between the corridor's opposing walls and
+// open it into the sound room to avoid the two other door swing areas.
+function centerSoundDoorInCorridor(){
+  const find=(kind,name)=>{
+    const m=model.meshes.filter(o=>String(o.level)==='3'&&o.kind===kind&&o.name===name);
+    if(m.length!==1)throw Error('Не найдена геометрия двери: '+name);
+    return m[0];
+  };
+  const wall=find('wall','Перегородки'), door=find('door','Двери');
+  const skirt=find('interior_stone','Каменный плинтус');
+  const eq=(a,b)=>Math.abs(a-b)<1e-5;
+  const get=(mesh,b)=>{
+    const p=mesh.vertices.slice(8*b,8*b+8);
+    if(p.length!==8)throw Error('Не найдена часть: '+mesh.name+' '+b);
+    return p;
+  };
+  function replaceY(mesh,b,from,to){
+    let n=0;for(const p of get(mesh,b))if(eq(p[1],from)){p[1]=to;n++;}
+    if(n!==4)throw Error('Несовпадение положения: '+mesh.name+' '+b);
+  }
+  function shiftY(mesh,b,delta){for(const p of get(mesh,b))p[1]+=delta;}
+  // Opposite corridor walls have internal faces Y=6.65 and Y=9.30.
+  // Door opening stays 1.10 m wide, centred on Y=7.975.
+  replaceY(wall,9,8.10,7.425);
+  replaceY(wall,10,9.20,8.525);
+  replaceY(wall,11,8.10,7.425);
+  replaceY(wall,11,9.20,8.525);
+  for(const b of [36,37])replaceY(skirt,b,8.10,7.425);
+  for(const b of [40,41])replaceY(skirt,b,9.20,8.525);
+  shiftY(skirt,39,-.675);shiftY(skirt,42,-.675);
+  // Leaf thickness and height are retained; the hinge is mirrored about the
+  // the wall center X=25.94 m, moving the hinge to the room face X≈25.88 m.
+  for(const p of get(door,3)){p[0]=51.88-p[0];p[1]-=.675;}
+  door.faces=door.faces.map(face=>face.every(i=>i>=24&&i<32)?[face[0],face[2],face[1]]:face);
+}
+centerSoundDoorInCorridor();
+
 
 
 
