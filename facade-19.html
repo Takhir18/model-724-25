@@ -1584,7 +1584,7 @@ const floorsWithNeighbour=new WeakMap();
 function activeGroups(){
  if(state.level==='all')return visibleTrusses(groups);
  let selected=state.cutaway?cutGroups(state.level):((state.top||state.level==='1')?planFloors:fullFloors).get(state.level);
- if(state.level==='1'||state.level==='2'){
+ if(state.level==='1'||state.level==='2'||state.level==='3'){
   if(!floorsWithNeighbour.has(selected))floorsWithNeighbour.set(selected,[...selected,...neighbourContext]);
   selected=floorsWithNeighbour.get(selected);
  }
