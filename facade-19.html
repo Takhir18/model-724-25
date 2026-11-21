@@ -301,7 +301,7 @@ for(const [x0,y0,x1,y1] of [[0,0,41.6,17.3],[35.72,-2,41.6,0],[11.2,17.3,26.35,2
  const found=model.meshes.filter(m=>String(m.level)==='1'&&m.kind==='wall'&&m.name==='Перегородки');
  if(found.length!==1)throw Error('Не найдены стены санузлов первого этажа');
  const walls=found[0], close=(a,b)=>Math.abs(a-b)<.001;
- for(const [start,x0,x1,oldMin] of [[272,15.77,15.89,13.22],[296,17.57,17.69,13.12]]){
+ for(const [start,x0,x1,oldMin] of [[272,15.77,15.89,13.22],[296,17.574,17.694,13.12]]){
   const points=walls.vertices.slice(start,start+8);
   if(points.length!==8||!points.every(p=>close(p[0],x0)||close(p[0],x1))||
      !points.every(p=>close(p[1],oldMin)||close(p[1],17.3)))
