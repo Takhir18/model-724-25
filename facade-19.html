@@ -239,17 +239,38 @@ for(const [x,y] of [[13.2,17.98],[19,17.98]])painting(x,y);
 for(const x of [11.4,14.2,17,20,23,26,29,32,35,38])ceiling(x,10.7,1.1);
 for(const x of [20.4,23,26,29,32,35])painting(x,11.65);
 for(const [x,y] of [[11.7,19.3],[15.0,19.3],[19,19.3],[22.0,20.0],[14.0,24.5]])ceiling(x,y,1.2);
-// Visible sanitary fixtures in the four existing sanitary rooms.
-for(const [x,y] of [[14,16.2],[18.3,16.2],[14,12.8],[18.3,12.8]]){
-  officeBox('Тумба под раковину','#c1aa8e',x-.4,y-.22,.06,x+.4,y+.22,.78);
-  officeBox('Раковина','#f1eee9',x-.38,y-.2,.78,x+.38,y+.2,.88);
-  officeBox('Зеркало','#b8c3c2',x-.36,y+.24,1.05,x+.36,y+.26,1.8);
-  ceiling(x,y,1);
-}
-for(const [x,y] of [[13.35,15.0],[18.0,15.0],[13.3,12.0],[18.0,12.0]]){
-  officeBox('Санузел · унитаз','#f0eee9',x-.19,y-.32,.02,x+.19,y+.15,.42);
-  officeBox('Санузел · бачок','#eeeae4',x-.18,y+.10,.40,x+.18,y+.25,.78);
-}
+// Fixtures aligned to the ten toilet cubicles and their rear walls.
+(function arrangeSanitaryFixtures(){
+  for(const [x,y,side] of [[14.65,14.40,-1],[18.48,14.40,-1],[14.65,13.60,1],[18.48,13.60,1]]){
+    officeBox('Тумба под раковину','#c1aa8e',x-.4,y-.20,.06,x+.4,y+.20,.78);
+    officeBox('Раковина','#f1eee9',x-.38,y-.19,.78,x+.38,y+.19,.88);
+    const back=y+side*.22;
+    officeBox('Зеркало','#b8c3c2',x-.36,back-.012,1.05,x+.36,back+.012,1.8);
+    ceiling(x,y,1);
+  }
+  const ceramic={level:1,kind:'sanitary_fixture',name:'Унитазы в кабинках',color:'#efeee9',vertices:[],faces:[]};
+  const seat={level:1,kind:'sanitary_fixture',name:'Сиденья унитазов',color:'#fbfaf6',vertices:[],faces:[]};
+  function oval(mesh,x,y,rx,ry,z0,z1){
+    const n=20,k=mesh.vertices.length;
+    for(const z of [z0,z1])for(let i=0;i<n;i++){
+      const t=2*Math.PI*i/n;mesh.vertices.push([x+rx*Math.cos(t),y+ry*Math.sin(t),z]);
+    }
+    for(let i=0;i<n;i++){const j=(i+1)%n;mesh.faces.push([k+i,k+j,k+n+j],[k+i,k+n+j,k+n+i]);}
+    for(let i=1;i<n-1;i++)mesh.faces.push([k,k+i+1,k+i],[k+n,k+n+i,k+n+i+1]);
+  }
+  const stalls=[[11.72,12.82],[12.94,13.94],[14.06,15.06],[15.18,16.18],[16.30,17.30]];
+  for(const [y0,y1] of stalls){
+    const y=(y0+y1)/2;
+    for(const side of [-1,1]){
+      const x=side<0?13.11:20.24;
+      oval(ceramic,x,y,.28,.18,.06,.40);
+      oval(seat,x+(side<0?.015:-.015),y,.255,.165,.40,.445);
+      if(side<0)officeBox('Унитаз · бачок','#ecebe6',12.74,y-.16,.38,12.92,y+.16,.77);
+      else officeBox('Унитаз · бачок','#ecebe6',20.47,y-.16,.38,20.65,y+.16,.77);
+    }
+  }
+  model.meshes.push(ceramic,seat);
+})();
 // Thin floor finish rests on the existing slab and does not alter circulation.
 for(const [x0,y0,x1,y1] of [[0,0,41.6,17.3],[35.72,-2,41.6,0],[11.2,17.3,26.35,26.4]])
   officeBox('Пол первого этажа · светлый дуб','#c5a47d',x0,y0,.003,x1,y1,.008,'office_floor');
