@@ -51,6 +51,12 @@ const meshes=archive.mesh.map(m=>{
  const faces=Array.from({length:m.nf},()=>[index(),index(),index()]);return {...m,vertices,faces}
 });
 const model={meshes,labels:archive.labels,notes:archive.notes,sectionImage:archive.sectionImage,plans:JSON.parse(document.getElementById('floor-plans').textContent)};
+// Clear the seven seats directly alongside the mezzanine stair flight.
+for (const mesh of model.meshes) {
+  if (mesh.instances && String(mesh.name).startsWith('Well_Seat')) {
+    mesh.instances = mesh.instances.filter(([x,y]) => !(Math.abs(x-27.075)<0.01 && y>=11.8 && y<=15.5));
+  }
+}
 model.meshes=model.meshes.flatMap(mesh=>{
  if(!mesh.instances)return [mesh];
  const {instances,...part}=mesh;
