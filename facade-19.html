@@ -690,6 +690,72 @@ function makeSingleTerraceDoor(){
     '#353739',29.801,6.65,9.71,29.832,7.55,9.75));
 }
 makeSingleTerraceDoor();
+// Keep the facade window below the mezzanine, 150 mm below its underside.
+function fitSecondFloorWindowBelowMezzanine(){
+  const select=(level,kind,name)=>{
+    const found=model.meshes.filter(m=>String(m.level)===String(level)&&m.kind===kind&&m.name===name);
+    if(found.length!==1)throw Error('Не найдена геометрия окна: '+level+' / '+kind+' / '+name);
+    return found[0];
+  };
+  function setBlockTop(mesh,blocks,oldTop,newTop){
+    for(const block of blocks){
+      let count=0;
+      for(let i=block*8;i<(block+1)*8;i++){
+        const p=mesh.vertices[i];
+        if(!p)throw Error('Не найдена вершина окна '+mesh.name+' / '+block);
+        if(Math.abs(p[2]-oldTop)<1e-5){p[2]=newTop;count++;}
+      }
+      if(count!==4)throw Error('Неверная высота окна '+mesh.name+' / '+block);
+    }
+  }
+  function removeBlocks(mesh,blocks){
+    for(const block of blocks){
+      const start=block*8;
+      if(!mesh.vertices[start+7])throw Error('Не найден элемент окна '+mesh.name+' / '+block);
+      const before=mesh.faces.length;
+      mesh.faces=mesh.faces.filter(f=>!f.every(i=>i>=start&&i<start+8));
+      if(before-mesh.faces.length!==12)throw Error('Неверная геометрия окна '+mesh.name+' / '+block);
+    }
+  }
+  function box(level,kind,name,color,x0,y0,z0,x1,y1,z1){
+    const vertices=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],
+      [x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
+    const faces=[[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],
+      [1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];
+    model.meshes.push({level,kind,name,color,vertices,faces});
+  }
+  const frame=select(2,'frame','Рама · Фасад 1–8');
+  const glazing=select(2,'glass','Остекление · Фасад 1–8');
+  const mullions=select(2,'frame','Стойки переплёта · Фасад 1–8');
+  setBlockTop(frame,[10,11],6.8,6.45);
+  setBlockTop(glazing,[2],6.8,6.398);
+  setBlockTop(mullions,[5,6],6.8,6.45);
+  box(2,'frame','Рама окна под антресолью',frame.color,26.922,-.367,6.398,29.1,-.267,6.45);
+
+  // Remove only the continuation of this window above the mezzanine floor.
+  removeBlocks(select(3,'frame','Рама · Фасад 1–8'),[2,3,4]);
+  removeBlocks(select(3,'glass','Остекление · Фасад 1–8'),[0]);
+  removeBlocks(select(3,'frame','Стойки переплёта · Фасад 1–8'),[0,1]);
+
+  // Restore the wall and interior finish on each level independently.
+  const masonry2=select(2,'exterior','Кладка · Фасад 1–8');
+  const masonry3=select(3,'exterior','Кладка · Фасад 1–8');
+  const plaster2=select(2,'interior_plaster','Минеральная штукатурка');
+  const plaster3=select(3,'interior_plaster','Минеральная штукатурка');
+  for(const [level,z0,z1,masonry,plaster] of [[2,6.45,6.8,masonry2,plaster2],[3,6.8,7.3,masonry3,plaster3]]){
+    box(level,'exterior','Кладка над окном · Фасад 1–8',masonry.color,26.922,-.64,z0,29.1,0,z1);
+    box(level,'interior_plaster','Штукатурка над окном · Фасад 1–8',plaster.color,26.922,.001,z0,29.1,.003,z1);
+  }
+  const skirting=select(3,'interior_stone','Каменный плинтус');
+  for(const [x0,x1] of [[26.922,27.727],[27.873,29.1]])
+    box(3,'interior_stone','Плинтус над окном · Фасад 1–8',skirting.color,x0,.003,6.8,x1,.013,6.905);
+  // Continue the facade cladding over the former upper portion of the opening.
+  for(const [level,z0,z1] of [[2,6.4565,6.8],[3,6.8,7.0935],[3,7.1065,7.3]])
+    for(const [x0,x1] of [[26.9285,27.8935],[27.9065,29.0935]])
+      box(level,'exterior','Графитовые плиты над окном · Фасад 1–8','#353739',x0,-.672,z0,x1,-.641,z1);
+}
+fitSecondFloorWindowBelowMezzanine();
+
 
 
 
