@@ -1368,12 +1368,10 @@ lengthenMezzanineStairFlights();
  box('Соседнее здание 23/1 · вход','#d8d6ce',-9.1,ymin-.08,.04,-7.5,ymin-.04,2.35);
  box('Соседнее здание 23/1 · дверное стекло','#4d5c60',-9.0,ymin-.09,.12,-7.6,ymin-.08,2.25);
  box('Соседнее здание 23/1 · козырёк','#484440',-9.3,ymin-.75,2.35,-7.3,ymin-.02,2.48);
- // Move the neighbour to the opposite side, flush to the exterior face.
- // The 4.4 m shift keeps it clear of the projecting wing.
- for(const m of byColor.values()){
-  for(const p of m.vertices){p[0]-=4.4;p[1]=17.94+(-.37-p[1]);}
-  for(const face of m.faces)[face[1],face[2]]=[face[2],face[1]];
- }
+ // Position the neighbour alongside the terrace end, following the red outline.
+ // The setback from the main wall is approximate, inferred from the image.
+ for(const m of byColor.values())
+  for(const p of m.vertices){p[0]+=42.0;p[1]-=1.63;}
  model.meshes.push(...byColor.values());
 })();
 const $=id=>document.getElementById(id), clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
